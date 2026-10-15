@@ -1,0 +1,885 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------
+// TENANT CONFIGURATION
+// ------------------------------------------------------
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String
+  domain    String?  @unique
+  plan      String   @default("trial")
+  active    Boolean  @default(true)
+  profileJson String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users          User[]
+  roles          Role[]
+  leads          Lead[]
+  customers      Customer[]
+  pipelines      Pipeline[]
+  conversations  Conversation[]
+  Deal           Deal[]
+  Integration    Integration[]
+  Workflow       Workflow[]
+  WhatsAppConfig WhatsAppConfig?
+  Product        Product[]
+  Quotation      Quotation[]
+  Invoice        Invoice[]
+  UsageMetric    UsageMetric[]
+  AuditLog       AuditLog[]
+  CustomField    CustomField[]
+  FormLayout     FormLayout[]
+  LeadGroup      LeadGroup[]
+  Funnel         Funnel[]
+  Activity       Activity[]
+  Task           Task[]
+  File           File[]
+  Contact        Contact[]
+  Payment        Payment[]
+  emailAccounts  EmailAccount[]
+  emailMessages  EmailMessage[]
+  calendarSyncs  CalendarSync[]
+  calendarEvents CalendarEvent[]
+  cases          Case[]
+  solutions      Solution[]
+  PriceBook      PriceBook[]
+  SalesOrder     SalesOrder[]
+  PurchaseOrder  PurchaseOrder[]
+  Vendor         Vendor[]
+}
+
+// ------------------------------------------------------
+// FORM BUILDER (DYNAMIC LAYOUTS)
+// ------------------------------------------------------
+
+model FormLayout {
+  id         String   @id @default(uuid())
+  companyId  String
+  entityType String   // "lead", "customer", "deal"
+  layoutJson Json     // Stores sections and fields order
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  @@unique([companyId, entityType])
+}
+
+// ------------------------------------------------------
+// USERS & RBAC
+// ------------------------------------------------------
+
+model User {
+  id           String    @id @default(uuid())
+  companyId    String
+  roleId       String?
+  name         String
+  email        String    @unique
+  phone        String?   @unique
+  passwordHash String
+  otpCode      String?
+  otpExpiresAt DateTime?
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role    Role?   @relation(fields: [roleId], references: [id])
+  deals   Deal[]
+  leads   Lead[]
+  groupsCreated LeadGroup[]
+  assignedPipelines Pipeline[] @relation("PipelineAssignedUsers")
+  activitiesPerformed Activity[]
+  tasksAssigned       Task[]     @relation("TaskAssignedTo")
+  tasksCreated        Task[]     @relation("TaskCreatedBy")
+  filesUploaded       File[]
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  permissions String[] // JSON or Array of permissions (e.g., ["lead.view", "lead.edit"])
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  users   User[]
+
+  @@unique([companyId, name])
+}
+
+// ------------------------------------------------------
+// LEADS & CUSTOMERS
+// ------------------------------------------------------
+
+model CustomField {
+  id          String   @id @default(uuid())
+  companyId   String
+  entityType  String   @default("lead") // "lead", "customer", "deal"
+  name        String   // "Course Name", "Property Type"
+  key         String   // "course_name", "property_type"
+  type        String   @default("text") // "text", "number", "dropdown", "date"
+  options     Json?    // e.g., ["1 BHK", "2 BHK", "3 BHK"] for dropdown
+  isRequired  Boolean  @default(false)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, entityType, key])
+}
+
+model Lead {
+  id             String    @id @default(uuid())
+  companyId      String
+  name           String
+  customerType   String    @default("Business") // "Individual" or "Business"
+  displayName    String?
+  clientName     String?
+  companyName    String?
+  phone          String?
+  alternatePhone String?
+  whatsappNumber String?
+  email          String?
+  jobTitle       String?
+  country        String?
+  state          String?
+  city           String?
+  address        String?
+  industry       String?
+  facebookUrl    String?
+  twitterUrl     String?
+  linkedinUrl    String?
+  websiteUrl     String?
+  leadType       String?
+  source         String?
+  notes          String?
+  groupId        String?
+  funnelId       String?
+
+  group          LeadGroup? @relation(fields: [groupId], references: [id])
+  funnel         Funnel?    @relation(fields: [funnelId], references: [id])
+  callStatus     String    @default("Untouched")
+  feedback       String?
+  status         String    @default("New")
+  priority       String    @default("Medium") // High, Medium, Low
+  estimatedValue Float?    // Potential deal value
+  nextFollowUp   DateTime? // Follow-up date
+  customData     Json?     // Stores the actual values for the custom fields
+  assignedToId   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // AI Lead Scoring & Qualification Fields
+  leadScore      Int?      // AI-computed lead score (0-100)
+  isQualified    Boolean?  // AI qualification status
+  qualifiedAt    DateTime? // When lead was qualified
+  qualificationReason String? // Reason for qualification
+  qualificationData Json?     // AI qualification data details
+  nextSteps      String?   // JSON array of next steps
+
+  company    Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignedTo User?   @relation(fields: [assignedToId], references: [id])
+  deals      Deal[]
+  activities Activity[]
+  tasks      Task[]
+  files      File[]
+  emails     EmailMessage[]
+
+  @@index([companyId, phone])
+  @@index([companyId, email])
+}
+
+model LeadGroup {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  active    Boolean  @default(true)
+  createdById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation(fields: [createdById], references: [id])
+  leads     Lead[]
+  pipelines Pipeline[]
+
+  @@unique([id, companyId])
+}
+
+model Funnel {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  leads     Lead[]
+
+  @@unique([id, companyId])
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  companyId String
+  name        String
+  customerType String   @default("Business") // "Individual" or "Business"
+  phone       String?
+  email       String?
+  companyName String?
+  jobTitle    String?
+  industry    String?
+  website     String?
+  address     String?
+  status      String   @default("Active")
+  customData  Json?    // For industry-specific dynamic fields
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  company   Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  deals     Deal[]
+  Quotation Quotation[]
+  Invoice   Invoice[]
+  activities Activity[]
+  tasks      Task[]
+  files      File[]
+  Payment        Payment[]
+  emails    EmailMessage[]
+  SalesOrder    SalesOrder[]
+}
+
+// ------------------------------------------------------
+// 7. EMAIL SYNC (2-WAY GMAIL/OUTLOOK)
+// ------------------------------------------------------
+
+model EmailAccount {
+  id            String   @id @default(uuid())
+  companyId     String
+  provider      String   // "gmail" or "outlook"
+  email         String   // The email address
+  accessToken   String?  // OAuth access token
+  refreshToken  String?  // OAuth refresh token
+  status        String   @default("disconnected") // "connected", "disconnected", "error"
+  syncEnabled   Boolean  @default(false)
+  syncInterval  Int      @default(300) // seconds between syncs
+  lastSyncAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  messages  EmailMessage[]
+
+  @@unique([companyId, email])
+}
+
+model EmailMessage {
+  id          String   @id @default(uuid())
+  companyId   String
+  emailAccountId String
+  messageId   String?  // Provider's message ID (for threading)
+  subject     String
+  from        String   // Sender email
+  fromName    String?  // Sender name
+  to          String[] // Recipient emails
+  cc          String[]
+  bcc         String[]
+  body        String?  // HTML body
+  snippet     String?  // Plain text preview
+  direction   String   // "inbound" or "outbound"
+  read        Boolean  @default(false)
+  starred     Boolean  @default(false)
+  folder      String   @default("inbox") // inbox, sent, drafts, trash
+  receivedAt  DateTime?
+  sentAt      DateTime?
+  attachments Json?    // List of attachment metadata
+  leadId      String?
+  customerId  String?
+  dealId      String?
+  activityId  String?  // Link to Activity record
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company          Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  emailAccount     EmailAccount     @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  lead             Lead?            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer         Customer?        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  deal             Deal?            @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, emailAccountId])
+  @@index([companyId, direction])
+  @@index([companyId, receivedAt])
+  @@index([messageId])
+}
+
+// ------------------------------------------------------
+// 8. CALENDAR SYNC (GOOGLE CALENDAR)
+// ------------------------------------------------------
+
+model CalendarSync {
+  id          String   @id @default(uuid())
+  companyId   String
+  provider    String   // "google" or "outlook"
+  accessToken String?
+  refreshToken String?
+  calendarId  String?  // Specific calendar ID to sync
+  status      String   @default("disconnected") // "connected", "disconnected", "error"
+  syncEnabled Boolean  @default(false)
+  syncEvents  Boolean  @default(true) // Sync events from calendar
+  syncTasks   Boolean  @default(true) // Sync tasks to calendar
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company      Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  events       CalendarEvent[]
+
+  @@unique([companyId, provider])
+}
+
+model CalendarEvent {
+  id          String   @id @default(uuid())
+  companyId   String
+  calendarSyncId String
+  eventId     String?  // Provider's event ID
+  title       String
+  description String?
+  startAt     DateTime
+  endAt       DateTime
+  location    String?
+  attendees   Json?    // List of attendee emails
+  status      String   @default("confirmed") // "confirmed", "cancelled", "tentative"
+  syncEnabled Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  calendarSync  CalendarSync   @relation(fields: [calendarSyncId], references: [id], onDelete: Cascade)
+  task          Task?          @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  deal          Deal?          @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  taskId        String?
+  dealId        String?
+
+  @@index([companyId, calendarSyncId])
+  @@index([companyId, startAt])
+  @@index([eventId])
+}
+
+// ------------------------------------------------------
+// SALES PIPELINE (DEALS)
+// ------------------------------------------------------
+
+model Pipeline {
+  id        String @id @default(uuid())
+  companyId String
+  name      String
+  type      String @default("DEAL") // LEAD or DEAL
+  details   String?
+  groupId   String?
+  attribute String?
+  createdAt DateTime @default(now())
+
+  company Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  group   LeadGroup?      @relation(fields: [groupId], references: [id])
+  stages  PipelineStage[]
+  assignedUsers User[]    @relation("PipelineAssignedUsers")
+}
+
+model PipelineStage {
+  id          String @id @default(uuid())
+  pipelineId  String
+  name        String
+  order       Int
+  rottingDays Int?    // Number of days before a deal is considered "rotting"
+  probability Int?    @default(0) // Win probability % (0-100)
+  color       String? @default("#4F46E5") // Stage color for UI (e.g. Hex code)
+
+  pipeline Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  deals    Deal[]
+}
+
+model Deal {
+  id         String   @id @default(uuid())
+  companyId  String
+  title      String
+  leadId     String?
+  customerId String?
+  stageId           String
+  value             Float     @default(0)
+  expectedCloseDate DateTime?
+  priority          String    @default("Medium") // High, Medium, Low
+  assignedToId      String?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead     Lead?         @relation(fields: [leadId], references: [id])
+  customer   Customer?     @relation(fields: [customerId], references: [id])
+  stage      PipelineStage @relation(fields: [stageId], references: [id])
+  assignedTo User?         @relation(fields: [assignedToId], references: [id])
+  activities Activity[]
+  tasks      Task[]
+  files      File[]
+  emails     EmailMessage[]
+  events     CalendarEvent[]
+}
+
+// ------------------------------------------------------
+// COMMUNICATIONS (OMNICHANNEL INBOX)
+// ------------------------------------------------------
+
+model Contact {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  phone     String
+  avatar    String?
+  status    String   @default("NEW") // NEW, ACTIVE, INACTIVE
+  lastMessageAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, phone])
+  @@index([companyId, phone])
+}
+
+model Conversation {
+  id            String   @id @default(uuid())
+  companyId     String
+  channel       String // "whatsapp", "email", "instagram", "facebook"
+  status        String   @default("open")
+  category      String   @default("GENERAL") // "GENERAL", "LEAD", "SUPPORT", "SALES", "URGENT"
+  priority      String   @default("MEDIUM") // "LOW", "MEDIUM", "HIGH"
+  contactName   String?
+  contactAvatar String?
+  lastMessageAt DateTime @default(now())
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  messages Message[]
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+  direction      String // "inbound" or "outbound"
+  content        String
+  ack            Int      @default(0) // 0=pending, 1=sent, 2=delivered, 3=read, -1=error
+  whatsappMsgId  String?  // WhatsApp's own message ID for ack tracking
+  timestamp      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+// ------------------------------------------------------
+// 1. LEAD INTEGRATIONS & TRAFFIC
+// ------------------------------------------------------
+
+model Integration {
+  id           String   @id @default(uuid())
+  companyId    String
+  providerName String // "facebook", "shopify", "justdial"
+  accessToken  String?
+  refreshToken String?
+  status       String   @default("active")
+  configJson   String? // Additional settings
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, providerName])
+}
+
+// ------------------------------------------------------
+// 2. AI AGENTS & WORKFLOW MAKER
+// ------------------------------------------------------
+
+model Workflow {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  description String?
+  triggerType String // "lead_created", "message_received"
+  status      String   @default("active") // "active", "draft", "inactive"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  actions WorkflowAction[]
+}
+
+model WorkflowAction {
+  id         String  @id @default(uuid())
+  workflowId String
+  actionType String // "send_whatsapp", "ai_reply", "create_deal"
+  order      Int
+  configJson String? // Stores message template, AI prompt, etc.
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+}
+
+// ------------------------------------------------------
+// 3. WHATSAPP BYOK (BRING YOUR OWN KEY)
+// ------------------------------------------------------
+
+model WhatsAppConfig {
+  id                 String   @id @default(uuid())
+  companyId          String   @unique
+  phoneNumberId      String
+  wabaId             String
+  accessToken        String
+  webhookVerifyToken String
+  status             String   @default("disconnected")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+// ------------------------------------------------------
+// 4. SALES, QUOTATIONS & INVOICING
+// ------------------------------------------------------
+
+model Product {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  sku         String?
+  category    String?
+  productType String?  @default("Goods")
+  description String?
+  price       Float
+  costPrice   Float?   @default(0)
+  taxRate     Float?   @default(0)
+  hsnCode     String?
+  currency    String   @default("INR")
+  stock       String   @default("Unlimited")
+  unit        String?  @default("Unit")
+  minStock    Int?     @default(0)
+  status      String   @default("Active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model Quotation {
+  id         String    @id @default(uuid())
+  companyId  String
+  customerId String
+  totalValue Float
+  status     String    @default("draft") // "draft", "sent", "accepted", "rejected"
+  itemsJson  String // Details of products
+  validUntil DateTime?
+  createdAt  DateTime  @default(now())
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+model Invoice {
+  id            String   @id @default(uuid())
+  companyId     String
+  customerId    String
+  amount        Float
+  status        String   @default("unpaid") // "unpaid", "paid", "overdue"
+  dueDate       DateTime
+  paymentMethod String?
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+model PriceBook {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  description String?
+  price       Float    @default(0)
+  currency    String   @default("INR")
+  itemType    String?  @default("product") // "product", "service", "package"
+  itemId      String?  // Reference to Product or Service ID
+  itemsJson   String?  // JSON list of products with custom prices [{ productId, productName, sku, standardPrice, listPrice, discountPercent }]
+  status      String   @default("Active")
+  effectiveDate DateTime?
+  expiryDate   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  salesOrders SalesOrder[]
+}
+
+model SalesOrder {
+  id              String   @id @default(uuid())
+  companyId       String
+  customerId      String
+  priceBookId     String?
+  validUntil      DateTime?
+  status          String   @default("pending") // "pending", "confirmed", "shipped", "delivered", "cancelled"
+  shippingAddress String?
+  billingAddress   String?
+  notes           String?
+  subtotal        Float
+  taxAmount       Float   @default(0)
+  discountAmount  Float   @default(0)
+  totalAmount     Float
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company     Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer    Customer   @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  priceBook   PriceBook? @relation(fields: [priceBookId], references: [id])
+}
+
+model PurchaseOrder {
+  id              String   @id @default(uuid())
+  companyId       String
+  vendorId        String
+  validUntil      DateTime?
+  status          String   @default("pending") // "pending", "approved", "ordered", "received", "cancelled"
+  shippingAddress String?
+  billingAddress   String?
+  notes           String?
+  subtotal        Float
+  taxAmount       Float   @default(0)
+  discountAmount  Float   @default(0)
+  totalAmount     Float
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  company  Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  vendor   Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+}
+
+model Vendor {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  email       String?
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  taxId       String?
+  contactPerson String?
+  status      String   @default("Active")
+  rating      Float     @default(0)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  purchaseOrders PurchaseOrder[]
+}
+
+model Payment {
+  id          String   @id @default(uuid())
+  companyId   String
+  customerId  String
+  amount      Float
+  method      String   @default("Bank Transfer") // "Bank Transfer", "Credit Card", "Cash", "Stripe", "PayPal"
+  type        String   @default("in") // "in" or "out"
+  status      String   @default("Pending") // "Pending", "Completed", "Failed", "Refunded"
+  notes       String?
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+// ------------------------------------------------------
+// 5. ANALYTICS & AUDIT LOGS
+// ------------------------------------------------------
+
+model UsageMetric {
+  id             String   @id @default(uuid())
+  companyId      String
+  date           DateTime // Stored as YYYY-MM-DD
+  messagesSent   Int      @default(0)
+  aiTokensUsed   Int      @default(0)
+  workflowsFired Int      @default(0)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, date])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  companyId String
+  userId    String?
+  action    String // e.g. "USER_LOGIN", "DEAL_DELETED"
+  entity    String // e.g. "Deal", "User"
+  entityId  String?
+  details   String? // JSON string of changes
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+// ------------------------------------------------------
+// 6. ACTIVITIES, TASKS (REMINDERS), & FILES
+// ------------------------------------------------------
+
+model Activity {
+  id            String   @id @default(uuid())
+  companyId     String
+  type          String   // "NOTE", "CALL", "EMAIL", "MEETING", "STATUS_CHANGE", "SYSTEM"
+  title         String?  // Optional short summary (e.g. "Called client")
+  description  String?  // Detailed note or transcript
+  metadata      Json?    // Stores call duration, S3 URL for call recording, email headers, etc.
+  
+  // Polymorphic associations (can belong to Lead, Customer, or Deal)
+  leadId        String?
+  customerId    String?
+  dealId        String?
+  
+  performedById String? // User who did the activity
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead          Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  deal          Deal?     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  performedBy   User?     @relation(fields: [performedById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, type])
+  @@index([leadId])
+  @@index([dealId])
+}
+
+model Task {
+  id           String   @id @default(uuid())
+  companyId    String
+  title        String   // e.g. "Follow up call"
+  description  String?
+  dueDate      DateTime
+  status       String   @default("PENDING") // "PENDING", "COMPLETED", "CANCELLED"
+  priority     String   @default("MEDIUM")  // "HIGH", "MEDIUM", "LOW"
+  
+  // Polymorphic associations
+  leadId       String?
+  customerId   String?
+  dealId       String?
+  
+  assignedToId String? // User responsible for this task
+  createdById  String? // User who created the task
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead         Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer     Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  deal         Deal?     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  assignedTo   User?     @relation("TaskAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdBy    User?     @relation("TaskCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  events       CalendarEvent[]
+
+  @@index([companyId, status])
+  @@index([assignedToId, status])
+  @@index([dueDate])
+}
+
+model File {
+  id           String   @id @default(uuid())
+  companyId    String
+  fileName     String
+  fileType     String   // "application/pdf", "image/jpeg", etc.
+  fileSize     Int      // in bytes
+  url          String   // Cloud URL (S3, Cloudinary)
+  
+  // Polymorphic associations
+  leadId       String?
+  customerId   String?
+  dealId       String?
+  
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  company      Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead         Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  customer     Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  deal         Deal?     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  uploadedBy   User?     @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+}
+
+// ------------------------------------------------------
+// CASES & KNOWLEDGE BASE SOLUTIONS
+// ------------------------------------------------------
+
+model Case {
+  id              String        @id @default(uuid())
+  companyId       String?
+  caseNumber      String
+  subject         String
+  customerName    String
+  customerEmail   String?       @default("")
+  customerCompany String?       @default("")
+  category        String        @default("Technical Support")
+  priority        String        @default("Medium")
+  status          String        @default("Open")
+  assignedTo      String?       @default("Unassigned")
+  description     String        @default("")
+  resolution      String?       @default("")
+  comments        CaseComment[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  company         Company?      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status])
+  @@index([companyId, priority])
+}
+
+model CaseComment {
+  id         String   @id @default(uuid())
+  caseId     String
+  author     String
+  role       String   @default("Agent") // "Customer", "Agent", "System"
+  content    String
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  case       Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+}
+
+model Solution {
+  id             String   @id @default(uuid())
+  companyId      String?
+  title          String
+  slug           String
+  category       String   @default("General & Getting Started")
+  status         String   @default("Published")
+  summary        String   @default("")
+  problem        String   @default("")
+  stepsToResolve String[]
+  tips           String[] @default([])
+  tags           String[] @default(["support"])
+  author         String   @default("Support Team")
+  views          Int      @default(0)
+  helpfulCount   Int      @default(0)
+  unhelpfulCount Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company        Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, category])
+  @@index([companyId, status])
+}

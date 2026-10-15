@@ -1,0 +1,255 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  ============================================
+  KEROCRM — INDUSTRY STANDARD DESIGN SYSTEM
+  ============================================
+
+  Based on analysis of: Salesforce, HubSpot, Zoho CRM, Freshsales, Pipedrive
+
+  FONT: Inter (used by HubSpot, Notion, Linear, Vercel)
+  SIZE SCALE:
+    xs:   11px — table labels, badges, timestamps
+    sm:   12px — secondary text, input hints
+    base: 13px — table rows, body text (CRM standard is 13-14px)
+    md:   14px — primary body, card text
+    lg:   16px — section headings
+    xl:   18px — card titles
+    2xl:  22px — page titles
+    3xl:  28px — dashboard numbers
+
+  LINE HEIGHT: 1.5 for body, 1.2 for headings
+
+  BRAND COLOR: Indigo-600 (#4F46E5)
+  SUCCESS:     Emerald-600 (#059669)
+  WARNING:     Amber-500  (#F59E0B)
+  DANGER:      Red-600    (#DC2626)
+  ============================================
+*/
+
+@layer base {
+  :root {
+    /* === PRIMARY BRAND: Purple === */
+    --primary: 258 51% 34%;
+    /* #462b85 */
+    --primary-foreground: 0 0% 100%;
+
+    /* === LAYOUT === */
+    --background: 220 14% 96%;
+    /* gray-100 page bg */
+    --foreground: 222 47% 11%;
+    /* gray-900 text */
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 220 13% 91%;
+    --muted-foreground: 215 16% 47%;
+    /* gray-500 */
+
+    --accent: 239 68% 96%;
+    /* indigo-50 */
+    --accent-foreground: 239 68% 40%;
+    /* indigo-700 */
+
+    --destructive: 0 84% 60%;
+    /* red-500 */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    /* gray-200 */
+    --input: 220 13% 91%;
+    --ring: 258 51% 34%;
+    /* #462b85 focus ring */
+
+    --radius: 0.5rem;
+    /* 8px — matches Salesforce/HubSpot */
+  }
+}
+
+@layer base {
+
+  /* === FONT FAMILY: Inter (Industry Standard) === */
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-gray-100 text-gray-900;
+    font-size: 13px;
+    /* CRM standard body size (Salesforce = 13px, HubSpot = 14px) */
+    line-height: 1.5;
+  }
+
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  /* === HEADING SCALE === */
+  h1 {
+    @apply text-2xl font-bold text-gray-900 leading-tight;
+  }
+
+  /* 24px — Page Title */
+  h2 {
+    @apply text-lg font-semibold text-gray-900 leading-snug;
+  }
+
+  /* 18px — Section Title */
+  h3 {
+    @apply text-base font-semibold text-gray-800 leading-snug;
+  }
+
+  /* 16px — Card Title */
+  h4 {
+    @apply text-sm font-semibold text-gray-700;
+  }
+
+  /* 14px — Sub-section */
+
+  /* === TABLE STANDARD (like Salesforce list views) === */
+  table {
+    @apply w-full text-sm text-left;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  thead tr th {
+    @apply px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50 border-b border-gray-200;
+  }
+
+  tbody tr td {
+    @apply px-4 py-3 text-[13px] text-gray-700 border-b border-gray-100;
+  }
+
+  tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  tbody tr:hover td {
+    @apply bg-indigo-50/40;
+  }
+
+  /* === INPUT STANDARD === */
+  input,
+  select,
+  textarea {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+  }
+
+  /* === DATE & DATETIME PICKER INDICATOR === */
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="time"] {
+    position: relative;
+    padding-right: 2rem !important;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    margin: 0;
+  }
+
+  /* === SCROLLBAR (like Salesforce) === */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+  }
+}
+
+/* === COMPONENT UTILITIES === */
+@layer utilities {
+
+  /* Standard CRM card */
+  .crm-card {
+    @apply bg-white rounded-lg border border-gray-200 shadow-sm;
+  }
+
+  /* Status badges — CRM standard */
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+  }
+
+  .badge-active {
+    @apply bg-emerald-100 text-emerald-700;
+  }
+
+  .badge-pending {
+    @apply bg-amber-100 text-amber-700;
+  }
+
+  .badge-inactive {
+    @apply bg-gray-100 text-gray-600;
+  }
+
+  .badge-error {
+    @apply bg-red-100 text-red-700;
+  }
+
+  .badge-primary {
+    @apply bg-indigo-100 text-indigo-700;
+  }
+
+  /* Page header — standard across all CRM pages */
+  .page-header {
+    @apply flex items-center justify-between mb-6;
+  }
+
+  .page-title {
+    @apply text-xl font-bold text-gray-900;
+  }
+
+  .page-subtitle {
+    @apply text-xs text-gray-500 mt-0.5;
+  }
+
+  /* Section label — like Salesforce field labels */
+  .field-label {
+    @apply block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1;
+  }
+
+  /* Page enter animation */
+  .page-enter {
+    @apply animate-in fade-in slide-in-from-bottom-2 duration-200;
+  }
+}
