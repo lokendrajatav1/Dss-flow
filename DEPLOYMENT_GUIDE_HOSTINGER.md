@@ -85,14 +85,14 @@ Paste your production settings:
 ```env
 PORT=4000
 NODE_ENV="production"
-DATABASE_URL="postgresql://neondb_owner:npg_7dMGNoTvbpD1@ep-divine-leaf-b3v22dmk-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
-JWT_SECRET="dssflow-secure-jwt-production-secret-key-2026"
+DATABASE_URL="your-postgresql-database-url-here"
+JWT_SECRET="your-secure-jwt-secret-key-here"
 JWT_EXPIRES_IN="7d"
 
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER="monupandey2649@gmail.com"
-SMTP_PASS="ikld vaun jqoe qyzo"
+SMTP_USER="your-email@gmail.com"
+SMTP_PASS="your-app-password"
 ```
 *(Save with `Ctrl + O` then `Enter`, exit with `Ctrl + X`)*
 
