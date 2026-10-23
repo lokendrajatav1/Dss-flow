@@ -14,7 +14,7 @@ export const sendEmail = async (to: string, subject: string, text: string, html?
     });
 
     const info = await transporter.sendMail({
-      from: `"KeroCRM" <${process.env.SMTP_USER}>`,
+      from: `"DSS Flow" <${process.env.SMTP_USER}>`,
       to,
       subject,
       text,

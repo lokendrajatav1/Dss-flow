@@ -16,7 +16,7 @@ export function SystemSettingsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">System Settings</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Global configuration for the KeroCRM platform.</p>
+          <p className="text-xs text-gray-500 mt-0.5">Global configuration for the DSS Flow platform.</p>
         </div>
         <Button onClick={handleSave} className={`gap-2 text-sm transition-all ${saved ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}>
           <Save className="w-4 h-4" /> {saved ? 'Saved!' : 'Save Settings'}

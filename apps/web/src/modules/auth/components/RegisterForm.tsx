@@ -178,6 +178,7 @@ export function RegisterForm() {
         </button>
       </form>
 
+      {/* Social Logins temporarily commented out until OAuth credentials are configured
       <div className="flex items-center mt-8 mb-6">
         <div className="flex-1 border-t border-slate-300"></div>
         <div className="px-4 text-[13px] text-slate-500">Or, Create a new account now</div>
@@ -208,6 +209,7 @@ export function RegisterForm() {
           </span>
         </button>
       </div>
+      */}
     </div>
   );
 }

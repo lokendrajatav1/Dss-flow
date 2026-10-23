@@ -57,7 +57,7 @@ export function AdminLayout() {
             <Shield className="w-4 h-4 text-white" />
           </div>
           <div>
-            <p className="text-white font-semibold text-sm leading-none">KeroCRM</p>
+            <p className="text-white font-semibold text-sm leading-none">DSS Flow</p>
             <p className="text-indigo-400 text-[10px] font-medium mt-0.5 uppercase tracking-wider">Super Admin</p>
           </div>
         </div>

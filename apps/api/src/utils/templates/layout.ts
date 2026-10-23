@@ -1,4 +1,4 @@
-export const baseLayout = (content: string, title: string = 'KeroCRM') => {
+export const baseLayout = (content: string, title: string = 'DSS Flow') => {
   return `
     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
       <!-- Header -->
@@ -17,7 +17,7 @@ export const baseLayout = (content: string, title: string = 'KeroCRM') => {
           This is an automated message, please do not reply.
         </p>
         <p style="margin: 8px 0 0 0; color: #94a3b8; font-size: 12px;">
-          &copy; ${new Date().getFullYear()} KeroCRM. All rights reserved.
+          &copy; ${new Date().getFullYear()} DSS Flow. All rights reserved.
         </p>
       </div>
     </div>
