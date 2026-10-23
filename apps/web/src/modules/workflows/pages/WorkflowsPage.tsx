@@ -235,8 +235,7 @@ export function WorkflowsPage() {
         cancelButtonColor: '#9CA3AF'
       }).then((result) => {
         if (result.isConfirmed) {
-          setLogsModalWorkflow({ id: wf.id, name: wf.name });
-          setIsLogsModalOpen(true);
+          handleViewLogs(wf.id, wf.name);
         }
       });
     } catch (err) {

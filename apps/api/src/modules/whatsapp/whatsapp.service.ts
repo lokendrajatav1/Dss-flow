@@ -368,7 +368,7 @@ class WhatsAppService {
       await prisma.conversation.update({
         where: { id: conversation.id },
         data: {
-          // assignedToId, // TODO: Add assignedToId to Conversation model
+          assignedToId: assignedToId,
           status: 'ASSIGNED'
         }
       });
@@ -426,12 +426,6 @@ class WhatsAppService {
 
         // Update contact with lead reference
         // TODO: Add leadId to Contact model
-        /*
-        await prisma.contact.update({
-          where: { id: contact.id },
-          data: { leadId: lead.id }
-        });
-        */
       }
 
       // Update lead status to indicate qualification

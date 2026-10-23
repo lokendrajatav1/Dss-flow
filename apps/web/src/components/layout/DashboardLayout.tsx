@@ -14,6 +14,7 @@ import {
   Search,
   X,
   Target,
+  Briefcase,
   BarChart,
   MessageCircle,
   FileText,
@@ -45,10 +46,15 @@ import {
   Phone,
   LifeBuoy,
   MessageSquareText,
-  Mail
+  Mail,
+  PhoneCall,
+  LayoutGrid
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useDialer } from '@/context/TelephonyContext';
+import { WebDialerWidget } from '@/components/dialer/WebDialerWidget';
+import { NotificationCenter } from '@/components/notifications/NotificationCenter';
 
 export function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -56,6 +62,7 @@ export function DashboardLayout() {
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({});
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { openDialer, callStatus } = useDialer();
 
   const handleLogout = () => {
     Swal.fire({
@@ -83,6 +90,7 @@ export function DashboardLayout() {
 
   const navigation: NavItem[] = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['superadmin', 'companyadmin', 'employee'] },
+    { name: 'Management Hub', href: '/management', icon: LayoutGrid, roles: ['superadmin', 'companyadmin'] },
     {
       name: 'Sales',
       icon: Target,
@@ -91,11 +99,11 @@ export function DashboardLayout() {
         { name: 'Leads', href: '/lead-manager', icon: UserPlus },
         { name: 'Leads Pipelines', href: '/leads-pipelines', icon: GitBranch },
         { name: 'Contacts', href: '/contacts', icon: Users },
+        { name: 'Deals', href: '/deals', icon: Briefcase },
         { name: 'Deals Pipelines', href: '/deals-pipelines', icon: Folder },
         { name: 'Groups', href: '/groups', icon: Users },
         { name: 'Funnels', href: '/funnels', icon: Target },
         { name: 'Reminder Calendar', href: '/calendar', icon: CalendarDays },
-        { name: 'Payments', href: '/payments', icon: CreditCard },
       ]
     },
     {
@@ -151,6 +159,7 @@ export function DashboardLayout() {
       ]
     },
     { name: 'Reports', href: '/reports', icon: BarChart, roles: ['superadmin', 'companyadmin'] },
+    { name: 'Team & Permissions', href: '/team', icon: Users, roles: ['superadmin', 'companyadmin'] },
     { name: 'Integrations', href: '/integrations', icon: Blocks, roles: ['superadmin', 'companyadmin'] },
     {
       name: 'Settings',
@@ -158,9 +167,7 @@ export function DashboardLayout() {
       roles: ['superadmin', 'companyadmin'],
       children: [
         { name: 'Company Profile', href: '/company-profile', icon: Building2 },
-        { name: 'Team Management', href: '/settings?tab=team', icon: Users },
-        { name: 'Roles & Permissions', href: '/permissions', icon: ShieldCheck },
-        { name: 'Billing', href: '/billing', icon: CreditCard },
+        { name: 'Team & Roles', href: '/team', icon: Users },
       ]
     },
   ];
@@ -348,23 +355,45 @@ export function DashboardLayout() {
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
-            <button className="relative p-2 text-gray-700 border border-blue-200/60 rounded-xl hover:bg-gray-50 transition-colors">
-              <Bell className="w-5 h-5" fill="currentColor" />
-              <span className="absolute -top-2 -right-2 flex items-center justify-center w-5 h-5 bg-[#7c3aed] text-white text-[11px] font-bold rounded-full ring-[3px] ring-[#ede9fe]">
-                3
-              </span>
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            {/* In-App Web Phone Header Trigger */}
+            <button 
+              type="button"
+              onClick={() => openDialer()}
+              className={`relative w-9 h-9 flex items-center justify-center rounded-lg border transition-all cursor-pointer shadow-xs ${
+                callStatus === 'connected' || callStatus === 'dialing'
+                  ? 'border-emerald-300 bg-emerald-50 text-emerald-700 animate-pulse ring-2 ring-emerald-100'
+                  : 'border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 hover:border-gray-300'
+              }`}
+              title="Open In-App Web Phone"
+            >
+              <PhoneCall className={`w-4 h-4 ${callStatus === 'connected' ? 'text-emerald-600' : 'text-gray-600'}`} />
+              {callStatus === 'connected' && (
+                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+              )}
             </button>
 
-            <button className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+            {/* Real-time In-App Notification Center */}
+            <NotificationCenter />
+
+            {/* Subtle Divider */}
+            <div className="h-5 w-px bg-gray-200 mx-1" />
+
+            {/* User Profile Pill */}
+            <button className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
               <img
-                src={`https://ui-avatars.com/api/?name=${user?.name ?? 'Tamal'}&background=f97316&color=fff&bold=true`}
+                src={`https://ui-avatars.com/api/?name=${user?.name ?? 'User'}&background=007bff&color=fff&bold=true`}
                 alt="Profile"
-                className="w-9 h-9 rounded-full object-cover"
+                className="w-8 h-8 rounded-full object-cover ring-1 ring-gray-200/80 shadow-xs"
               />
-              <div className="hidden md:flex items-center gap-1">
-                <p className="text-[15px] font-medium text-gray-800">Hi! {user?.name ? user.name.split(' ')[0] : 'Tamal'}</p>
-                <ChevronDown className="w-5 h-5 text-gray-900 stroke-[2.5]" />
+              <div className="hidden md:flex items-center gap-1.5">
+                <span className="text-sm font-medium text-gray-700">
+                  Hi, {user?.name ? user.name.split(' ')[0] : 'User'}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
               </div>
             </button>
           </div>
@@ -375,6 +404,9 @@ export function DashboardLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Embedded In-App Floating Web Dialer Widget */}
+      <WebDialerWidget />
     </div>
   );
 }

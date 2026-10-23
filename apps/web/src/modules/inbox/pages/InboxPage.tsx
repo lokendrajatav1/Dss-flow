@@ -188,8 +188,12 @@ export function InboxPage() {
 
   useEffect(() => {
     fetchConversations();
-    // In dev, assuming the api runs on localhost:4000
-    const newSocket = io('http://localhost:4000');
+    const socketUrl =
+      import.meta.env.VITE_SOCKET_URL ||
+      (import.meta.env.VITE_API_URL
+        ? import.meta.env.VITE_API_URL.replace(/\/api\/v1\/?$/, '')
+        : window.location.origin);
+    const newSocket = io(socketUrl);
     setSocket(newSocket);
 
     newSocket.on('conversations_updated', () => {

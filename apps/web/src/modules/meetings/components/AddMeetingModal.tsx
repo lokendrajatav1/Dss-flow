@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Meeting, MEETING_PLATFORMS, MEETING_STATUSES } from '../types';
+import { Meeting, MEETING_PLATFORMS } from '../types';
+import { EntityLookupInput, EntityLookupItem } from '@/components/common/EntityLookupInput';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 
@@ -23,6 +24,7 @@ interface AddMeetingModalProps {
 
 export function AddMeetingModal({ isOpen, onClose, onSave, availableMembers }: AddMeetingModalProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedEntity, setSelectedEntity] = useState<EntityLookupItem | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     clientName: '',
@@ -42,6 +44,7 @@ export function AddMeetingModal({ isOpen, onClose, onSave, availableMembers }: A
   useEffect(() => {
     if (isOpen) {
       setIsLoading(false);
+      setSelectedEntity(null);
       setFormData({
         title: '',
         clientName: '',
@@ -59,6 +62,20 @@ export function AddMeetingModal({ isOpen, onClose, onSave, availableMembers }: A
       });
     }
   }, [isOpen, availableMembers]);
+
+  const handleSelectEntity = (item: EntityLookupItem | null) => {
+    setSelectedEntity(item);
+    if (item) {
+      setFormData(prev => ({
+        ...prev,
+        clientName: item.name,
+        clientCompany: item.companyName || '',
+        clientPhone: item.phone || '',
+        clientEmail: item.email || '',
+        host: (typeof item.assignedTo === 'string' ? item.assignedTo : item.assignedTo?.name) || prev.host
+      }));
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -108,7 +125,7 @@ export function AddMeetingModal({ isOpen, onClose, onSave, availableMembers }: A
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-xl animate-in fade-in zoom-in duration-200">
+      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col border border-gray-200 animate-in fade-in zoom-in duration-200">
         {/* Modal Header */}
         <div className="flex-none flex items-center justify-between p-4 border-b border-gray-100 bg-white rounded-t-2xl z-20">
           <h2 className="text-xl font-semibold text-gray-900">Schedule New Meeting</h2>
@@ -127,6 +144,17 @@ export function AddMeetingModal({ isOpen, onClose, onSave, availableMembers }: A
                 placeholder="e.g. Product Demo & Discussion" 
                 value={formData.title} 
                 onChange={e => setFormData({ ...formData, title: e.target.value })} 
+              />
+            </div>
+
+            {/* Related Entity Selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-1.5">
+                Related To
+              </label>
+              <EntityLookupInput
+                onSelect={handleSelectEntity}
+                selectedItem={selectedEntity}
               />
             </div>
 

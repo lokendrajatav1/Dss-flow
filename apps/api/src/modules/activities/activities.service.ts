@@ -16,7 +16,7 @@ export class ActivitiesService {
 
   static async createActivity(companyId: string, leadId: string | undefined, userId: string, data: any) {
     const finalLeadId = leadId || data.leadId || null;
-    return prisma.activity.create({
+    const activity = await prisma.activity.create({
       data: {
         companyId,
         leadId: finalLeadId,
@@ -31,6 +31,41 @@ export class ActivitiesService {
         performedBy: { select: { id: true, name: true } }
       }
     });
+
+    // Auto-create Task if next follow-up date was scheduled in metadata (excluding calls)
+    if (data.type !== 'CALL' && data.metadata?.nextFollowUp && finalLeadId) {
+      try {
+        await prisma.task.create({
+          data: {
+            companyId,
+            leadId: finalLeadId,
+            assignedToId: data.assignedToId || userId,
+            createdById: userId,
+            title: data.metadata?.outcome || data.title || 'Follow-up',
+            description: data.description || `Follow-up call scheduled for ${activity.lead?.name || 'Contact'}`,
+            dueDate: new Date(data.metadata.nextFollowUp),
+            status: 'PENDING',
+            priority: 'HIGH'
+          }
+        });
+      } catch (err) {
+        console.error('Failed to auto-create follow-up task:', err);
+      }
+    }
+
+    // Update lead's call status if specified
+    if (finalLeadId && (data.metadata?.outcome || data.metadata?.status)) {
+      try {
+        await prisma.lead.update({
+          where: { id: finalLeadId },
+          data: { callStatus: data.metadata.outcome || data.metadata.status }
+        });
+      } catch (err) {
+        console.error('Failed to update lead status from call activity:', err);
+      }
+    }
+
+    return activity;
   }
 
   static async deleteActivity(companyId: string, leadId: string, activityId: string) {

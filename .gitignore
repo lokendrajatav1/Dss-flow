@@ -1,40 +1,110 @@
-# Dependencies
-node_modules/
-.pnpm-store/
-pnpm-debug.log*
+# ==============================================================================
+# DSS FLOW CRM - Comprehensive .gitignore (Security & Production Protection)
+# ==============================================================================
 
-# Environment Variables & Secrets
+# ------------------------------------------------------------------------------
+# 1. Environment Variables & Secrets (CRITICAL: NEVER COMMIT TO GIT OR PUBLIC)
+# ------------------------------------------------------------------------------
 .env
-.env.local
-.env.*.local
+.env.*
 *.env
+**/.env*
 !.env.example
+!**/.env.example
 
-# WhatsApp Web Sessions & Puppeteer/Chromium cache
+# ------------------------------------------------------------------------------
+# 2. WhatsApp Web Sessions, Tokens & Browser Profiles
+# ------------------------------------------------------------------------------
 .wwebjs_auth/
 .wwebjs_auth*/
 .wwebjs_cache/
+**/.wwebjs_auth/
+**/.wwebjs_auth*/
+**/.wwebjs_cache/
+**/.wwebjs_cache*/
+*.session
+session/
+sessions/
 
-# Build & Compilation Outputs
+# ------------------------------------------------------------------------------
+# 3. Dependencies & Package Manager Stores
+# ------------------------------------------------------------------------------
+node_modules/
+**/node_modules/
+.pnpm-store/
+**/.pnpm-store/
+
+# ------------------------------------------------------------------------------
+# 4. Build, Bundler & Compilation Outputs
+# ------------------------------------------------------------------------------
 dist/
+**/dist/
 build/
+**/build/
 out/
+**/out/
 *.tsbuildinfo
+**/*.tsbuildinfo
 
-# Debug logs
+# ------------------------------------------------------------------------------
+# 5. Local Scratch, Temporary, Test Data & Debug Dumps
+# ------------------------------------------------------------------------------
+apps/api/test-*
+apps/api/scratch-*
+apps/api/lid-*
+apps/api/check*
+apps/api/create_migration.js
+apps/api/seedLeads.ts
+scratch/
+**/scratch/
+tmp/
+**/tmp/
+temp/
+**/temp/
+*.sql
+*.dump
+*.csv
+*.xlsx
+*.tsv
+
+# ------------------------------------------------------------------------------
+# 6. SSL Certificates, Private Keys & Tokens
+# ------------------------------------------------------------------------------
+*.pem
+*.key
+*.crt
+*.cer
+*.pfx
+*.p12
+
+# ------------------------------------------------------------------------------
+# 7. Logs & Process Identifiers
+# ------------------------------------------------------------------------------
 *.log
+**/*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+logs/
+**/logs/
+*.pid
+*.seed
 
-# OS & Editor Files
+# ------------------------------------------------------------------------------
+# 8. Operating System & Editor Files
+# ------------------------------------------------------------------------------
 .DS_Store
 Thumbs.db
+desktop.ini
 .vscode/
 .idea/
+*.sublime-project
+*.sublime-workspace
 
-# Agent & IDE internal caches
+# ------------------------------------------------------------------------------
+# 9. AI Agent, IDE Internal Caches & System Logs
+# ------------------------------------------------------------------------------
 .gemini/
 .agent/
 .agents/

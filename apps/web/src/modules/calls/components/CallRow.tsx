@@ -80,7 +80,7 @@ export const CallRow: React.FC<CallRowProps> = ({
                             </span>
 
                             {/* Hover Popover */}
-                            <div className="absolute left-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-xl opacity-0 invisible group-hover/name:opacity-100 group-hover/name:visible transition-all duration-200 z-[60] p-4 flex flex-col gap-2.5">
+                            <div className="absolute left-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-lg opacity-0 invisible group-hover/name:opacity-100 group-hover/name:visible transition-all duration-200 z-[60] p-4 flex flex-col gap-2.5">
                                 <div className="absolute -top-1.5 left-4 w-3 h-3 bg-white border-t border-l border-gray-200 transform rotate-45"></div>
 
                                 <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
@@ -152,7 +152,7 @@ export const CallRow: React.FC<CallRowProps> = ({
 
                             {openMoreId === call.id && (
                                 <div
-                                    className="absolute right-full mr-2 top-1/2 -translate-y-1/2 bg-white border border-gray-200 shadow-lg rounded-md p-1.5 flex items-center gap-1.5 z-50 animate-in fade-in zoom-in duration-150"
+                                    className="absolute right-full mr-2 top-1/2 -translate-y-1/2 bg-white border border-gray-200 rounded-md p-1.5 flex items-center gap-1.5 z-50 animate-in fade-in zoom-in duration-150"
                                     onClick={(e) => e.stopPropagation()}
                                 >
                                     <button

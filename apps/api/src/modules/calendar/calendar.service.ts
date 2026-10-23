@@ -60,14 +60,24 @@ export class CalendarService {
   // ─── Calendar Events ─────────────────────────────────────
 
   static async getEvents(companyId: string, filters: any = {}) {
-    const { syncId, startDate, endDate, page = 1, pageSize = 20 } = filters;
+    const { syncId, startDate, endDate, page = 1, pageSize = 50 } = filters;
+    const pageNum = Math.max(1, parseInt(String(page), 10) || 1);
+    const limit = Math.max(1, parseInt(String(pageSize), 10) || 50);
 
     const where: any = { companyId };
     if (syncId) where.calendarSyncId = syncId;
     if (startDate || endDate) {
       where.startAt = {};
-      if (startDate) where.startAt.gte = new Date(startDate);
-      if (endDate) where.startAt.lte = new Date(endDate);
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        where.startAt.gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.startAt.lte = end;
+      }
     }
 
     const total = await prisma.calendarEvent.count({ where });
@@ -79,11 +89,11 @@ export class CalendarService {
         deal: { select: { title: true } },
       },
       orderBy: { startAt: 'asc' },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
+      skip: (pageNum - 1) * limit,
+      take: limit,
     });
 
-    return { events, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
+    return { events, total, page: pageNum, pageSize: limit, totalPages: Math.ceil(total / limit) };
   }
 
   static async getEvent(companyId: string, eventId: string) {
@@ -98,15 +108,31 @@ export class CalendarService {
   }
 
   static async createEvent(companyId: string, data: any) {
+    let syncId = data.calendarSyncId;
+    if (!syncId) {
+      let sync = await prisma.calendarSync.findFirst({ where: { companyId } });
+      if (!sync) {
+        sync = await prisma.calendarSync.create({
+          data: {
+            companyId,
+            provider: 'crm_local',
+            status: 'connected',
+            syncEnabled: false,
+          },
+        });
+      }
+      syncId = sync.id;
+    }
+
     return prisma.calendarEvent.create({
       data: {
         companyId,
-        calendarSyncId: data.calendarSyncId,
+        calendarSyncId: syncId,
         eventId: data.eventId,
         title: data.title,
         description: data.description,
         startAt: new Date(data.startAt),
-        endAt: new Date(data.endAt),
+        endAt: data.endAt ? new Date(data.endAt) : new Date(new Date(data.startAt).getTime() + 60 * 60 * 1000),
         location: data.location,
         attendees: data.attendees ?? null,
         status: data.status || 'confirmed',

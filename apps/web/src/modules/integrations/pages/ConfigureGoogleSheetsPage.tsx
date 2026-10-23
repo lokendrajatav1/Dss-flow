@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Copy, CheckCircle2, Plus, Trash2, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Copy, CheckCircle2, Plus, Trash2, ChevronDown, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -74,8 +74,64 @@ export function ConfigureGoogleSheetsPage() {
 
   const [mappings, setMappings] = useState([{ id: Date.now(), header: 'Name', field: 'name' }]);
 
-  const API_BASE = import.meta.env.VITE_API_URL || 'https://api.yourdomain.com/api/v1';
+  // Test Lead State
+  const [testName, setTestName] = useState('Vikas Gupta (Sheets Test)');
+  const [testPhone, setTestPhone] = useState('+91 98765 43211');
+  const [testEmail, setTestEmail] = useState('vikas.sheets@testlead.com');
+  const [testCity, setTestCity] = useState('Delhi');
+  const [testBudget, setTestBudget] = useState('50000');
+  const [isSendingTest, setIsSendingTest] = useState(false);
+
+  const API_BASE = import.meta.env.VITE_API_URL 
+    ? import.meta.env.VITE_API_URL.replace(/\/api\/v1\/?$/, '') 
+    : 'http://localhost:4000';
   const webhookUrl = `${API_BASE}/webhooks/google-sheets/${user?.companyId || 'YOUR_COMPANY_ID'}`;
+
+  const handleSendTestLead = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!testName || !testPhone) {
+      Swal.fire('Required Fields', 'Please enter at least Name and Phone number.', 'warning');
+      return;
+    }
+
+    setIsSendingTest(true);
+    try {
+      const res = await api.post(`/webhooks/google-sheets/${user?.companyId || 'YOUR_COMPANY_ID'}`, {
+        name: testName,
+        phone: testPhone,
+        email: testEmail,
+        city: testCity,
+        budget: testBudget,
+        groupId: selectedGroup || undefined,
+        funnelId: selectedFunnel || undefined,
+        assignedTo: selectedTeamMembers.length > 0 ? selectedTeamMembers : undefined
+      });
+
+      if (res.data?.success) {
+        Swal.fire({
+          title: 'Google Sheet Test Lead Created!',
+          text: `Lead for ${testName} (${testPhone}) has been captured successfully in your CRM.`,
+          icon: 'success',
+          showCancelButton: true,
+          confirmButtonColor: '#007bff',
+          cancelButtonColor: '#6c757d',
+          confirmButtonText: 'Go to Lead Manager',
+          cancelButtonText: 'Stay Here'
+        }).then((result) => {
+          if (result.isConfirmed) {
+            navigate('/lead-manager');
+          }
+        });
+      } else {
+        Swal.fire('Error', res.data?.message || 'Failed to process lead', 'error');
+      }
+    } catch (err: any) {
+      console.error('Failed to send test lead:', err);
+      Swal.fire('Error', err.response?.data?.message || err.message || 'Failed to connect to webhook API', 'error');
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -404,6 +460,95 @@ export function ConfigureGoogleSheetsPage() {
             </div>
 
           </div>
+        </div>
+
+        {/* Test Lead Verification Card */}
+        <div className="w-full bg-white border border-gray-200 rounded-xl shadow-sm p-8 text-left">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold">
+                <Send className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Send Test Google Sheet Lead (100% Flow Verification)</h3>
+                <p className="text-xs text-gray-500">Test that sheet rows are captured, assigned, and visible in your CRM right now</p>
+              </div>
+            </div>
+            <span className="bg-green-50 text-green-700 text-xs font-semibold px-2.5 py-1 rounded-full border border-green-200">
+              Ready to Test
+            </span>
+          </div>
+
+          <form onSubmit={handleSendTestLead} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Lead Name</label>
+                <input
+                  type="text"
+                  value={testName}
+                  onChange={(e) => setTestName(e.target.value)}
+                  placeholder="e.g. Vikas Gupta"
+                  className="w-full bg-white border border-gray-300 rounded-md h-10 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Mobile / Phone</label>
+                <input
+                  type="text"
+                  value={testPhone}
+                  onChange={(e) => setTestPhone(e.target.value)}
+                  placeholder="e.g. +91 98765 43211"
+                  className="w-full bg-white border border-gray-300 rounded-md h-10 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={testEmail}
+                  onChange={(e) => setTestEmail(e.target.value)}
+                  placeholder="e.g. vikas@example.com"
+                  className="w-full bg-white border border-gray-300 rounded-md h-10 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">City</label>
+                <input
+                  type="text"
+                  value={testCity}
+                  onChange={(e) => setTestCity(e.target.value)}
+                  placeholder="e.g. Delhi"
+                  className="w-full bg-white border border-gray-300 rounded-md h-10 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Budget</label>
+                <input
+                  type="text"
+                  value={testBudget}
+                  onChange={(e) => setTestBudget(e.target.value)}
+                  placeholder="e.g. 50000"
+                  className="w-full bg-white border border-gray-300 rounded-md h-10 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pt-2 gap-3">
+              <p className="text-xs text-gray-500">
+                Will be ingested with source <span className="font-semibold text-gray-700">Google Sheets</span> and assigned according to connection settings above.
+              </p>
+              <Button
+                type="submit"
+                disabled={isSendingTest}
+                className="bg-[#007bff] hover:bg-[#0069d9] text-white h-10 px-6 rounded-md font-medium shadow-sm gap-2 shrink-0"
+              >
+                <Send className="w-4 h-4" />
+                {isSendingTest ? 'Sending Test Lead...' : 'Send Test Google Sheet Lead'}
+              </Button>
+            </div>
+          </form>
         </div>
 
         {/* Mapping Box */}

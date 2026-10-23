@@ -2,7 +2,7 @@ import { Input } from "@/components/ui/input";
 import { Eye, EyeOff, Shield } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { zodResolver } from "@/lib/zodResolver";
 import * as z from "zod";
 import api from "@/lib/api";
 import { useState } from "react";

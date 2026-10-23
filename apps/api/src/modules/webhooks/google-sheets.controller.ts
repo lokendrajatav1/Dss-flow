@@ -13,14 +13,28 @@ export const handleGoogleSheetsWebhook = async (req: Request, res: Response) => 
 
     const payload = req.method === 'GET' ? req.query : req.body;
     
-    // The payload is expected to have { data: [...], groupId, funnelId, assignedTo: [...] }
-    const records = Array.isArray(payload.data) ? payload.data : [];
+    // Support multiple payload formats:
+    // 1. { data: [...] }
+    // 2. Direct array: [...]
+    // 3. Single object: { name, phone, ... }
+    // 4. { data: { ... } }
+    let records: any[] = [];
+    if (Array.isArray(payload)) {
+      records = payload;
+    } else if (Array.isArray(payload.data)) {
+      records = payload.data;
+    } else if (payload.data && typeof payload.data === 'object') {
+      records = [payload.data];
+    } else if (payload.name || payload.phone || payload.email || payload.Mobile || payload.Phone || payload.Name) {
+      records = [payload];
+    }
+
     const groupId = payload.groupId || null;
     const funnelId = payload.funnelId || null;
     const assignedToIds = Array.isArray(payload.assignedTo) ? payload.assignedTo : [];
 
     if (records.length === 0) {
-      return res.status(200).json({ success: true, message: 'No records to process' });
+      return res.status(200).json({ success: true, message: 'No records to process', received: payload });
     }
 
     let successCount = 0;
@@ -29,9 +43,40 @@ export const handleGoogleSheetsWebhook = async (req: Request, res: Response) => 
       const row = records[i];
       if (!row || typeof row !== 'object') continue;
 
-      const name = row['name'] || 'Google Sheet Lead';
-      const phone = row['phone'] ? String(row['phone']) : null;
-      const email = row['email'] ? String(row['email']) : null;
+      const normalizeKey = (k: string) => String(k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      const getField = (matchers: string[]) => {
+        const normalizedMatchers = matchers.map(normalizeKey);
+        
+        // Exact match on normalized keys
+        for (const [rk, rv] of Object.entries(row)) {
+          if (rv === null || rv === undefined || String(rv).trim() === '') continue;
+          const nrk = normalizeKey(rk);
+          if (normalizedMatchers.includes(nrk)) return rv;
+        }
+
+        // Substring / partial match on normalized keys
+        for (const [rk, rv] of Object.entries(row)) {
+          if (rv === null || rv === undefined || String(rv).trim() === '') continue;
+          const nrk = normalizeKey(rk);
+          for (const m of normalizedMatchers) {
+            if (nrk.includes(m)) return rv;
+          }
+        }
+        return null;
+      };
+
+      const nameRaw = getField(['name', 'fullname', 'customername', 'leadname', 'clientname', 'personname']);
+      const name = nameRaw ? String(nameRaw).trim() : 'Google Sheet Lead';
+
+      const phoneRaw = getField(['phone', 'mobile', 'mobilenumber', 'phonenumber', 'contact', 'contactnumber', 'whatsapp', 'cell', 'cellphone']);
+      const phone = phoneRaw ? String(phoneRaw).trim() : null;
+
+      const emailRaw = getField(['email', 'emailaddress', 'mail', 'emailid']);
+      const email = emailRaw ? String(emailRaw).trim() : null;
+
+      const cityRaw = getField(['city', 'location', 'town']);
+      const city = cityRaw ? String(cityRaw).trim() : null;
       
       const customData: any = {};
       
@@ -41,21 +86,26 @@ export const handleGoogleSheetsWebhook = async (req: Request, res: Response) => 
         assignedToId = assignedToIds[i % assignedToIds.length];
       }
       
-      // Standard Fields mapping
+      // Standard Fields mapping by normalized key
       const standardMap: Record<string, string> = {
-        'company_name': 'companyName',
+        'companyname': 'companyName',
+        'company': 'companyName',
         'address': 'address',
         'city': 'city',
         'state': 'state',
-        'job_title': 'jobTitle',
+        'jobtitle': 'jobTitle',
         'industry': 'industry',
-        'alternate_number': 'alternatePhone',
+        'alternatenumber': 'alternatePhone',
+        'alternatephone': 'alternatePhone',
         'whatsapp': 'whatsappNumber',
-        'facebook_url': 'facebookUrl',
-        'twitter_url': 'twitterUrl',
-        'linkedin_url': 'linkedinUrl',
-        'website_url': 'websiteUrl',
-        'notes': 'notes'
+        'whatsappnumber': 'whatsappNumber',
+        'facebookurl': 'facebookUrl',
+        'twitterurl': 'twitterUrl',
+        'linkedinurl': 'linkedinUrl',
+        'websiteurl': 'websiteUrl',
+        'website': 'websiteUrl',
+        'notes': 'notes',
+        'note': 'notes'
       };
 
       const leadData: any = {
@@ -70,13 +120,19 @@ export const handleGoogleSheetsWebhook = async (req: Request, res: Response) => 
 
       if (phone) leadData.phone = phone;
       if (email) leadData.email = email;
+      if (city) leadData.city = city;
 
       for (const [key, value] of Object.entries(row)) {
-        if (!value) continue;
-        if (key === 'name' || key === 'phone' || key === 'email') continue;
+        if (value === null || value === undefined || String(value).trim() === '') continue;
+        const normKey = normalizeKey(key);
+        
+        // Skip primary columns to avoid duplicating in customData
+        if (['name', 'fullname', 'customername', 'leadname', 'phone', 'mobile', 'mobilenumber', 'phonenumber', 'contact', 'email', 'emailaddress', 'emailid'].includes(normKey)) {
+          continue;
+        }
 
-        if (standardMap[key]) {
-          leadData[standardMap[key]] = String(value);
+        if (standardMap[normKey]) {
+          leadData[standardMap[normKey]] = String(value);
         } else {
           customData[key] = value;
         }

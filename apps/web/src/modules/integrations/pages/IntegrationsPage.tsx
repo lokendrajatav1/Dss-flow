@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Search, Settings, Plus, FileSpreadsheet, Download, Upload, Link as LinkIcon, MessageCircle } from 'lucide-react';
+import { Search, Settings, Plus, FileSpreadsheet, Download, Upload, Link as LinkIcon, MessageCircle, PhoneCall } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useNavigate } from 'react-router-dom';
 
 const INTEGRATIONS_LIST = [
+  { id: 'telephony', name: 'In-App Web Phone & Telephony', status: 'Configure', isBusinessPlan: false, icon: null, textIcon: <PhoneCall className="w-6 h-6" />, color: 'bg-indigo-600' },
   { id: 'fb_ig', name: 'Facebook & Instagram', status: 'Configure', isBusinessPlan: false, icons: ['https://upload.wikimedia.org/wikipedia/commons/1/1b/Facebook_icon.svg', 'https://upload.wikimedia.org/wikipedia/commons/e/e7/Instagram_logo_2016.svg'] },
   // { id: 'google_ads', name: 'Google Ads', status: 'Configure', isBusinessPlan: false, icon: 'https://thesvg.org/icons/google/default.svg' },
   { id: 'indiamart', name: 'IndiaMART', status: 'Configure', isBusinessPlan: false, icon: '/indiamart.png' },
@@ -101,6 +102,7 @@ export function IntegrationsPage() {
               <div className="flex items-center">
                 <button 
                   onClick={() => {
+                    if (app.id === 'telephony') navigate('/configure-telephony');
                     if (app.id === 'fb_ig') navigate('/configure-facebook');
                     if (app.id === 'justdial') navigate('/configure-justdial');
                     if (app.id === 'indiamart') navigate('/configure-indiamart');

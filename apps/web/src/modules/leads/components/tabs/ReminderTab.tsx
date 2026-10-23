@@ -3,9 +3,10 @@ import api from '@/lib/api';
 
 interface ReminderTabProps {
   lead: any;
+  refreshTrigger?: number;
 }
 
-export function ReminderTab({ lead }: ReminderTabProps) {
+export function ReminderTab({ lead, refreshTrigger = 0 }: ReminderTabProps) {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,7 +26,7 @@ export function ReminderTab({ lead }: ReminderTabProps) {
     };
     
     if (lead?.id) fetchTasks();
-  }, [lead?.id]);
+  }, [lead?.id, refreshTrigger]);
 
   const updateStatus = async (taskId: string, status: string) => {
     try {
@@ -43,6 +44,8 @@ export function ReminderTab({ lead }: ReminderTabProps) {
     return <div className="p-4 text-sm text-gray-500">Loading reminders...</div>;
   }
 
+  const reminderTasks = tasks.filter(t => !t.description?.startsWith('Call with ') && t.title !== '-None-');
+
   return (
     <div className="w-full">
       <table className="w-full text-left border-collapse">
@@ -55,14 +58,14 @@ export function ReminderTab({ lead }: ReminderTabProps) {
           </tr>
         </thead>
         <tbody>
-          {tasks.length === 0 ? (
+          {reminderTasks.length === 0 ? (
             <tr>
               <td colSpan={4} className="py-12 text-center text-[14px] text-gray-500 font-medium">
                 No reminders found.
               </td>
             </tr>
           ) : (
-            tasks.map(task => (
+            reminderTasks.map(task => (
               <tr key={task.id} className="border-b border-gray-100">
                 <td className="py-3 px-4 text-[14px] text-gray-900">
                   <div className="font-semibold">{task.title}</div>

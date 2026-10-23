@@ -8,6 +8,8 @@
 
 export const LEAD_SOURCES = [
   'Facebook',
+  'Meta Ads (Facebook/Instagram)',
+  'Google Sheets',
   'Google Form',
   'IndiaMart',
   'WordPress',
@@ -100,17 +102,24 @@ export const CALL_STATUSES = [
 ];
 
 export const CALL_OUTCOMES = [
+  '-None-',
   'Interested',
-  'Follow-up Required',
-  'Proposal Sent',
-  'Closed Won',
-  'Not Interested'
+  'Not interested',
+  'No response/Busy',
+  'Requested more info',
+  'Requested call back',
+  'Invalid number'
 ];
 
+export const CALL_RESULTS = CALL_OUTCOMES;
+
 export const CALL_DIRECTIONS = [
+  'Inbound',
   'Outbound',
-  'Inbound'
+  'Missed'
 ];
+
+export const CALL_TYPES = CALL_DIRECTIONS;
 
 export const CALL_PRIORITIES = [
   'Normal',
@@ -181,13 +190,12 @@ export const DEAL_PRIORITIES = [
 ];
 
 export const DEAL_STAGES = [
-  'Lead In',
-  'Contact Made',
-  'Requirements Gathered',
-  'Proposal Sent',
+  'Deal Raised',
   'Negotiation',
-  'Won',
-  'Lost'
+  'Awaiting Approval',
+  'Proposal Sent',
+  'Deal Won',
+  'Deal Lost'
 ];
 
 export const PIPELINE_TYPES = [
@@ -348,17 +356,6 @@ export const PRODUCT_STATUSES = [
 export const PRODUCT_TYPES = [
   'Goods',
   'Service'
-];
-
-export const PRODUCT_CATEGORIES = [
-  'General',
-  'Software & SaaS',
-  'Consulting & Professional Services',
-  'Hardware & Equipment',
-  'Subscription Plans',
-  'Annual Maintenance (AMC)',
-  'Training & Support',
-  'Accessories & Consumables'
 ];
 
 export const PRODUCT_UNITS = [

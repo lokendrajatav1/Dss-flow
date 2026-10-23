@@ -6,6 +6,7 @@ import { TbWorld } from 'react-icons/tb';
 import api from '@/lib/api';
 import { EditLeadModal } from '../components/EditLeadModal';
 import { SetReminderModal } from '../components/SetReminderModal';
+import { useDialer } from '@/context/TelephonyContext';
 import { ActivityTab } from '../components/tabs/ActivityTab';
 import { DealsTab } from '../components/tabs/DealsTab';
 import { ReminderTab } from '../components/tabs/ReminderTab';
@@ -25,6 +26,7 @@ const getInitials = (name?: string) => name ? name.split(' ').map(n => n[0]).joi
 export function ClientDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { startCall } = useDialer();
   const [lead, setLead] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Activity');
@@ -175,15 +177,26 @@ export function ClientDetailsPage() {
               <>
                 {lead.phone && (
                 <div className="relative group">
-                  <a
-                    href={`tel:${lead.phone}`}
-                    className="w-8 h-8 rounded-full flex items-center justify-center border shadow-sm transition-all hover:scale-105"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      startCall({
+                        id: lead.id,
+                        name: lead.name,
+                        phone: lead.phone,
+                        companyName: lead.companyName,
+                        email: lead.email,
+                        sourceType: 'lead'
+                      });
+                    }}
+                    className="w-8 h-8 rounded-full flex items-center justify-center border shadow-sm transition-all hover:scale-105 cursor-pointer"
                     style={{ background: '#3b82f6', borderColor: '#2563eb', color: '#ffffff' }}
+                    title="In-App Web Call"
                   >
                     <FaPhone size={14} style={{ transform: 'scaleX(-1)' }} />
-                  </a>
+                  </button>
                   <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 -translate-y-1 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 bg-gray-800 text-white text-[11px] font-semibold px-2 py-1 rounded-md whitespace-nowrap flex flex-col items-center">
-                    Call
+                    In-App Call
                     <span className="w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-800 absolute -bottom-1 left-1/2 -translate-x-1/2" />
                   </span>
                 </div>
@@ -414,8 +427,8 @@ export function ClientDetailsPage() {
         <div className="flex-1 p-6 overflow-y-auto">
           {activeTab === 'Activity' && <ActivityTab lead={lead} refreshTrigger={refreshTrigger} />}
           {activeTab === 'Deals (0)' && <DealsTab />}
-          {activeTab === 'Reminder' && <ReminderTab lead={lead} />}
-          {activeTab === 'Call Recording' && <CallRecordingTab />}
+          {activeTab === 'Reminder' && <ReminderTab lead={lead} refreshTrigger={refreshTrigger} />}
+          {activeTab === 'Call Recording' && <CallRecordingTab lead={lead} refreshTrigger={refreshTrigger} />}
           {activeTab === 'WA Activity' && <WAActivityTab />}
           {activeTab === 'Files' && <FilesTab lead={lead} />}
         </div>

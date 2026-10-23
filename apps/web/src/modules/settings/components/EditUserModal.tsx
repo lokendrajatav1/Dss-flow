@@ -5,16 +5,18 @@ import { Input } from '@/components/ui/input';
 
 interface EditUserModalProps {
   isOpen: boolean;
+  roles?: { id: string; name: string }[];
   onClose: () => void;
   onSubmit: (data: any) => Promise<void>;
   user: any;
 }
 
-export function EditUserModal({ isOpen, onClose, onSubmit, user }: EditUserModalProps) {
+export function EditUserModal({ isOpen, roles = [], onClose, onSubmit, user }: EditUserModalProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     password: '',
     roleName: 'Sales Rep'
   });
@@ -24,6 +26,7 @@ export function EditUserModal({ isOpen, onClose, onSubmit, user }: EditUserModal
       setFormData({
         name: user.name || '',
         email: user.email || '',
+        phone: user.phone || '',
         password: '',
         roleName: user.role?.name || 'Sales Rep'
       });
@@ -82,6 +85,20 @@ export function EditUserModal({ isOpen, onClose, onSubmit, user }: EditUserModal
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
+                Calling Number / Extension (Tata Trunk / Mobile)
+              </label>
+              <Input
+                value={formData.phone}
+                onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="e.g. 101, 102, or 9876543210"
+              />
+              <p className="text-[11px] text-gray-500 mt-1">
+                When this agent makes a call, Tata Trunk will connect to this number/extension.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Password <span className="text-gray-400 text-xs font-normal">(Leave blank to keep current)</span>
               </label>
               <Input
@@ -100,11 +117,22 @@ export function EditUserModal({ isOpen, onClose, onSubmit, user }: EditUserModal
               <select 
                 value={formData.roleName}
                 onChange={e => setFormData({ ...formData, roleName: e.target.value })}
-                className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium"
               >
-                <option value="Admin">Admin</option>
-                <option value="Manager">Manager</option>
-                <option value="Sales Rep">Sales Rep</option>
+                {roles.length > 0 ? (
+                  roles.map((r) => (
+                    <option key={r.id || r.name} value={r.name}>
+                      {r.name}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="Admin">Admin</option>
+                    <option value="Sales Manager">Sales Manager</option>
+                    <option value="Sales Rep">Sales Rep</option>
+                    <option value="Telecaller / Agent">Telecaller / Agent</option>
+                  </>
+                )}
               </select>
             </div>
           </div>

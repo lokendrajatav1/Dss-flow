@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Check, X, Clock } from 'lucide-react';
+import { Calendar, Check, X, Clock, Video, ExternalLink } from 'lucide-react';
 import api from '@/lib/api';
 import Swal from 'sweetalert2';
 
@@ -125,9 +125,13 @@ export function ActivityTab({ lead, refreshTrigger = 0 }: ActivityTabProps) {
                       <span className={`px-2 py-0.5 text-[11px] font-bold rounded-full border ${
                         act.type === 'CALL'
                           ? 'bg-[#e8f5e9] text-[#2e7d32] border-[#c8e6c9]'
+                          : act.type === 'MEETING'
+                          ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                          : act.type === 'REMINDER'
+                          ? 'bg-purple-50 text-purple-700 border-purple-200'
                           : 'bg-[#fff8e6] text-[#d97706] border-[#fde68a]'
                       }`}>
-                        ● {act.title?.replace('Call logged: ', '') || act.type}
+                        ● {act.title}
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
@@ -148,7 +152,7 @@ export function ActivityTab({ lead, refreshTrigger = 0 }: ActivityTabProps) {
                   {/* Message */}
                   {act.description && (
                     <div className="mb-4">
-                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">MESSAGE / NOTES</div>
+                      <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">MESSAGE</div>
                       <div className="text-[14px] text-gray-900 font-medium">{act.description}</div>
                     </div>
                   )}
@@ -205,6 +209,26 @@ export function ActivityTab({ lead, refreshTrigger = 0 }: ActivityTabProps) {
                           {new Date(act.metadata.followUpDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} · {new Date(act.metadata.followUpDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Meeting Link */}
+                  {act.metadata?.meetingLink && (
+                    <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                      <span className="text-xs text-gray-500 font-medium">
+                        Platform: <strong className="text-gray-700">{act.metadata?.platform || 'Video Call'}</strong>
+                        {act.metadata?.duration ? ` • ${act.metadata.duration}` : ''}
+                      </span>
+                      <a
+                        href={act.metadata.meetingLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-3 py-1.5 rounded-md transition-colors"
+                      >
+                        <Video className="w-3.5 h-3.5" />
+                        <span>Join Meeting</span>
+                        <ExternalLink className="w-3 h-3 ml-0.5" />
+                      </a>
                     </div>
                   )}
                 </div>

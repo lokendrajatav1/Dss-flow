@@ -21,7 +21,7 @@ interface SetReminderModalProps {
 export function SetReminderModal({ isOpen, onClose, lead, onSaved, initialCallStatus, initialTab = 'reminder' }: SetReminderModalProps) {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
-  const [callStatus, setCallStatus] = useState('Connected');
+  const [callStatus, setCallStatus] = useState(initialCallStatus || '');
   const [feedback, setFeedback] = useState('');
   const [bant, setBant] = useState({
     budget: null as boolean | null,
@@ -48,7 +48,7 @@ export function SetReminderModal({ isOpen, onClose, lead, onSaved, initialCallSt
 
       // Initialize with lead's current assigned user
       setTeamMember(lead.assignedToId || '');
-      setCallStatus(initialCallStatus || lead.callStatus || 'Connected');
+      setCallStatus(initialCallStatus || (lead.callStatus && lead.callStatus !== 'Untouched' ? lead.callStatus : ''));
       setActiveTab(initialTab);
       fetchUsers();
 
@@ -114,7 +114,7 @@ export function SetReminderModal({ isOpen, onClose, lead, onSaved, initialCallSt
       if (activeTab === 'activity') {
         await api.post(`/leads/${targetEntityId}/activities`, {
           type: 'NOTE',
-          title: callStatus || 'Activity',
+          title: callStatus,
           description: feedback,
           metadata: {
             activityDate: date ? new Date(date).toISOString() : null,
@@ -124,17 +124,17 @@ export function SetReminderModal({ isOpen, onClose, lead, onSaved, initialCallSt
       } else if (activeTab === 'reminder') {
         if (followUpDate || date) {
           await api.post(`/leads/${targetEntityId}/tasks`, {
-            title: 'Follow-up Reminder',
+            title: callStatus ? `${callStatus} Reminder` : 'Follow-up Reminder',
             description: feedback,
             dueDate: new Date(followUpDate || date).toISOString(),
             assignedToId: teamMember || undefined,
           }, { headers }).catch(e => console.warn('Task save warning:', e));
         }
 
-        // Also log the call attempt in Activities
+        // Log the reminder in Activities
         await api.post(`/leads/${targetEntityId}/activities`, {
-          type: 'CALL',
-          title: `Call logged: ${callStatus}`,
+          type: 'REMINDER',
+          title: callStatus,
           description: feedback,
           metadata: {
             bant: bant,
@@ -241,6 +241,7 @@ export function SetReminderModal({ isOpen, onClose, lead, onSaved, initialCallSt
                 onChange={(e) => setCallStatus(e.target.value)}
                 className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-700"
               >
+                <option value="">Select Call Status</option>
                 {CALL_STATUSES.map(status => (
                   <option key={status} value={status}>{status}</option>
                 ))}

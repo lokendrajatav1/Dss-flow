@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import { protect } from '../../middlewares/authMiddleware';
-import { getProducts, getProductById, createProduct, updateProduct, deleteProduct } from './products.controller';
+import {
+  getProducts,
+  getProductById,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+} from './products.controller';
 
 const router = Router();
 router.use(protect);

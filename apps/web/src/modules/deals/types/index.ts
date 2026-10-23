@@ -5,14 +5,20 @@ export interface Deal {
   id: string;
   title: string;
   leadId?: string;
+  lead?: any;
+  customerId?: string;
+  customer?: any;
   clientName?: string;
-  companyName: string;
+  companyName?: string;
   value: number; // in INR
   stageId: string;
+  stage?: { id: string; name: string };
   priority: string;
-  assignedTo: string;
+  assignedTo?: any;
   assignedToId?: string;
   expectedCloseDate?: string;
+  startDate?: string;
   notes?: string;
-  tags: string[];
+  tags?: string[];
+  createdAt?: string;
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Search, UserPlus, Shield, MoreVertical, Mail, Trash2, Edit2 } from 'lucide-react';
+import { Search, UserPlus, Shield, MoreVertical, Mail, Trash2, Edit2, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import axios from 'axios';
@@ -136,6 +136,7 @@ export function TeamManagementTab() {
           <thead>
             <tr className="bg-white border-b border-gray-100">
               <th className="px-6 py-3 text-left font-semibold text-gray-500">User</th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-500">Calling Extension / Phone</th>
               <th className="px-6 py-3 text-left font-semibold text-gray-500">Role</th>
               <th className="px-6 py-3 text-left font-semibold text-gray-500">Status</th>
               <th className="px-6 py-3 text-right font-semibold text-gray-500"></th>
@@ -144,11 +145,11 @@ export function TeamManagementTab() {
           <tbody className="divide-y divide-gray-50">
             {loading ? (
               <tr>
-                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">Loading team members...</td>
+                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">Loading team members...</td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">No team members found.</td>
+                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">No team members found.</td>
               </tr>
             ) : (
               filtered.map(member => (
@@ -166,6 +167,16 @@ export function TeamManagementTab() {
                         </div>
                       </div>
                     </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    {member.phone ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-mono font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded">
+                        <Phone className="w-3 h-3 text-indigo-500" />
+                        {member.phone}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">Not set</span>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold ${

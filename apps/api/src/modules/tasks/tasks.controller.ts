@@ -36,3 +36,39 @@ export const updateTaskStatus = async (req: AuthRequest, res: Response) => {
     res.status(400).json({ message: error.message });
   }
 };
+
+export const updateTask = async (req: AuthRequest, res: Response) => {
+  try {
+    const companyId = req.user!.companyId;
+    const { taskId } = req.params;
+    const task = await TasksService.updateTask(companyId, taskId, req.body);
+    res.json(task);
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+export const deleteTask = async (req: AuthRequest, res: Response) => {
+  try {
+    const companyId = req.user!.companyId;
+    const { taskId } = req.params;
+    await TasksService.deleteTask(companyId, taskId);
+    res.json({ message: 'Task deleted successfully' });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+export const bulkDeleteTasks = async (req: AuthRequest, res: Response) => {
+  try {
+    const companyId = req.user!.companyId;
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'ids array is required' });
+    }
+    await TasksService.bulkDeleteTasks(companyId, ids);
+    res.json({ message: 'Tasks deleted successfully' });
+  } catch (error: any) {
+    res.status(400).json({ message: error.message });
+  }
+};

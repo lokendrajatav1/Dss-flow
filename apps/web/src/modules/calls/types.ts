@@ -15,6 +15,9 @@ export interface CallItem {
   createdAt: string;
   dateTime?: string;
   nextFollowUp?: string;
+  recordingUrl?: string;
+  dialedVia?: string;
 }
 
-export { CALL_OUTCOMES, CALL_DIRECTIONS, CALL_PRIORITIES } from '@/lib/constants';
+export { CALL_OUTCOMES, CALL_RESULTS, CALL_DIRECTIONS, CALL_TYPES, CALL_PRIORITIES } from '@/lib/constants';
+

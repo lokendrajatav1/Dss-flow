@@ -6,17 +6,17 @@ import { Input } from '@/components/ui/input';
 import api from '@/lib/api';
 import Swal from 'sweetalert2';
 import {
-  PRODUCT_CATEGORIES,
   PRODUCT_UNITS,
   PRODUCT_STATUSES,
   PRODUCT_TYPES,
   TAX_RATES,
 } from '@/lib/constants';
+import { CategorySelectDropdown } from '@/components/common/CategorySelectDropdown';
 
 const initialProductFormData = {
   name: '',
   sku: '',
-  category: 'General',
+  category: '',
   productType: 'Goods',
   price: '',
   costPrice: '',
@@ -37,7 +37,6 @@ export function CreateProductPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(isEditMode);
-
   // Form State
   const [formData, setFormData] = useState(initialProductFormData);
 
@@ -61,7 +60,7 @@ export function CreateProductPage() {
         setFormData({
           name: data.name || '',
           sku: data.sku || '',
-          category: data.category || 'General',
+          category: data.category || '',
           productType: data.productType || 'Goods',
           price: data.price !== undefined ? String(data.price) : '',
           costPrice: data.costPrice !== undefined ? String(data.costPrice) : '',
@@ -310,15 +309,10 @@ export function CreateProductPage() {
                   <label className="block text-xs font-medium text-gray-700 mb-1">
                     Category
                   </label>
-                  <select
-                    className="w-full h-9 px-3 rounded-md border border-gray-300 text-sm bg-white outline-none focus:border-indigo-500"
+                  <CategorySelectDropdown
                     value={formData.category}
-                    onChange={e => handleChange('category', e.target.value)}
-                  >
-                    {PRODUCT_CATEGORIES.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
+                    onChange={cat => handleChange('category', cat)}
+                  />
                 </div>
 
                 <div>

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Filter, FileText, RefreshCw, Trash2, Search, MoreVertical,
   Star, Eye, Edit, Bell, Phone, Check,
-  ChevronLeft, ChevronRight, User
+  ChevronLeft, ChevronRight, User, ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
@@ -32,21 +33,8 @@ const timeAgo = (dateStr: string) => {
   return `${Math.floor(diff / 86400)} days ago`;
 };
 
-const INITIAL_TASKS: TaskItem[] = [];
-
 export function TasksPage() {
-  const [tasks, setTasks] = useState<TaskItem[]>(() => {
-    const saved = localStorage.getItem('crm_tasks_data');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Exclude legacy mock task records
-        const filtered = Array.isArray(parsed) ? parsed.filter(t => !['t-1', 't-2', 't-3', 't-4'].includes(t.id)) : [];
-        return filtered;
-      } catch (e) { /* ignore */ }
-    }
-    return INITIAL_TASKS;
-  });
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
 
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -70,9 +58,6 @@ export function TasksPage() {
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
   const [selectedLead, setSelectedLead] = useState<any>(null);
 
-  useEffect(() => {
-    localStorage.setItem('crm_tasks_data', JSON.stringify(tasks));
-  }, [tasks]);
 
   useEffect(() => {
     const handleClickOutside = () => {
@@ -106,81 +91,38 @@ export function TasksPage() {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const [leadsRes, tasksRes] = await Promise.allSettled([
-        api.get('/leads', { headers: { Authorization: `Bearer ${token}` } }),
-        api.get('/tasks', { headers: { Authorization: `Bearer ${token}` } })
-      ]);
+      const res = await api.get('/tasks', { headers: { Authorization: `Bearer ${token}` } });
+      const dbTasks = Array.isArray(res.data) ? res.data : [];
 
-      const leads = leadsRes.status === 'fulfilled' && Array.isArray(leadsRes.value.data) ? leadsRes.value.data : [];
-      const dbTasks = tasksRes.status === 'fulfilled' && Array.isArray(tasksRes.value.data) ? tasksRes.value.data : [];
-
-      const fetchedTasks: TaskItem[] = [];
-
-      // 1. Process Database Tasks
-      dbTasks.forEach((t: any) => {
+      const fetchedTasks: TaskItem[] = dbTasks.map((t: any) => {
         const lead = t.lead || {};
         const dtString = t.dueDate ? t.dueDate.slice(0, 16) : undefined;
         const datePart = dtString ? dtString.split('T')[0] : '';
-        const timePart = dtString ? dtString.split('T')[1] : '14:00';
+        const timePart = dtString && dtString.includes('T') ? dtString.split('T')[1].slice(0, 5) : '14:00';
         const rawPriority = (t.priority || 'Medium').toLowerCase();
         const formattedPriority = rawPriority.charAt(0).toUpperCase() + rawPriority.slice(1);
 
-        fetchedTasks.push({
-          id: `db-task-${t.id}`,
-          title: t.title || `Follow up: ${lead.name || 'Client'}`,
-          clientName: lead.name || 'Contact',
+        return {
+          id: t.id,
+          title: t.title || 'Task',
+          clientName: lead.name || 'General Client',
           companyName: lead.companyName || 'Organization',
           dueDate: datePart,
           dueTime: timePart,
           dueDateTime: dtString,
-          status: t.status === 'COMPLETED' ? 'Completed' : 'Pending',
+          status: t.status === 'COMPLETED' ? 'Completed' : t.status === 'CANCELLED' ? 'Cancelled' : 'Pending',
           priority: formattedPriority as any,
           assignedTo: t.assignedTo?.name || 'Unassigned',
-          description: t.description || 'Follow-up task created from CRM.',
+          description: t.description || '',
           phone: lead.phone || lead.whatsappNumber || '',
-          createdAt: t.createdAt || new Date().toISOString(),
-          nextFollowUp: t.dueDate
-        });
+          leadId: t.leadId || lead.id || undefined,
+          createdAt: t.createdAt || new Date().toISOString()
+        };
       });
 
-      // 2. Process Leads with nextFollowUp if not already in dbTasks
-      leads
-        .filter((l: any) => l.nextFollowUp != null)
-        .forEach((l: any) => {
-          const dtString = l.nextFollowUp ? l.nextFollowUp.slice(0, 16) : undefined;
-          const datePart = dtString ? dtString.split('T')[0] : '';
-          const timePart = dtString ? dtString.split('T')[1] : '14:00';
-
-          const alreadyAdded = fetchedTasks.some(t => t.phone && t.phone === l.phone);
-          if (!alreadyAdded) {
-            fetchedTasks.push({
-              id: `lead-task-${l.id}`,
-              title: `Follow up: ${l.name || 'Client'}`,
-              clientName: l.name || 'Lead Contact',
-              companyName: l.companyName || 'Lead Organization',
-              dueDate: datePart,
-              dueTime: timePart,
-              dueDateTime: dtString,
-              status: 'Pending',
-              priority: l.priority || 'Medium',
-              assignedTo: l.assignedTo?.name || 'Unassigned',
-              description: l.notes || l.feedback || 'Follow-up task created from Lead CRM.',
-              phone: l.phone || l.whatsappNumber || '',
-              createdAt: l.updatedAt || new Date().toISOString(),
-              nextFollowUp: l.nextFollowUp
-            });
-          }
-        });
-
-      if (fetchedTasks.length > 0) {
-        setTasks(prev => {
-          const fetchedIds = new Set(fetchedTasks.map(t => t.id));
-          const localOnly = prev.filter(t => !fetchedIds.has(t.id) && !t.id.startsWith('lead-task-') && !t.id.startsWith('db-task-'));
-          return [...fetchedTasks, ...localOnly];
-        });
-      }
+      setTasks(fetchedTasks);
     } catch (err) {
-      // Graceful fallback
+      console.error('Failed to fetch tasks', err);
     } finally {
       setLoading(false);
     }
@@ -210,75 +152,96 @@ export function TasksPage() {
   };
 
   const toggleComplete = async (id: string) => {
-    let nextStatus = 'Completed';
-    setTasks(tasks.map(t => {
-      if (t.id === id) {
-        nextStatus = t.status === 'Completed' ? 'Pending' : 'Completed';
-        return { ...t, status: nextStatus };
-      }
-      return t;
-    }));
+    const task = tasks.find(t => t.id === id);
+    if (!task) return;
+    const nextStatus = task.status === 'Completed' ? 'Pending' : 'Completed';
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: nextStatus } : t));
 
-    if (id.startsWith('db-task-')) {
-      const rawId = id.replace('db-task-', '');
-      try {
-        const token = localStorage.getItem('token');
-        if (token) {
-          await api.put(`/tasks/${rawId}/status`, { status: nextStatus === 'Completed' ? 'COMPLETED' : 'PENDING' }, { headers: { Authorization: `Bearer ${token}` } });
-        }
-      } catch (err) {
-        console.error('Failed to sync task status', err);
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        await api.put(`/tasks/${id}/status`, { status: nextStatus === 'Completed' ? 'COMPLETED' : 'PENDING' }, { headers: { Authorization: `Bearer ${token}` } });
       }
+      MySwal.fire({ 
+        title: nextStatus === 'Completed' ? 'Task Completed!' : 'Marked as Pending', 
+        icon: 'success', 
+        timer: 1000, 
+        showConfirmButton: false 
+      });
+    } catch (err) {
+      console.error('Failed to sync task status', err);
+      fetchTasksData();
     }
-
-    MySwal.fire({ 
-      title: nextStatus === 'Completed' ? 'Task Completed!' : 'Marked as Pending', 
-      icon: 'success', 
-      timer: 1000, 
-      showConfirmButton: false 
-    });
   };
 
-  const updateStatus = (id: string, newStatus: string) => {
-    setTasks(tasks.map(t => t.id === id ? { ...t, status: newStatus } : t));
-    MySwal.fire({ title: 'Updated!', text: `Status set to ${newStatus}`, icon: 'success', timer: 1000, showConfirmButton: false });
+  const updateStatus = async (id: string, newStatus: string) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        await api.put(`/tasks/${id}/status`, { status: newStatus.toUpperCase() }, { headers: { Authorization: `Bearer ${token}` } });
+      }
+      MySwal.fire({ title: 'Updated!', text: `Status set to ${newStatus}`, icon: 'success', timer: 1000, showConfirmButton: false });
+    } catch (err) {
+      console.error('Failed to update status', err);
+      fetchTasksData();
+    }
   };
 
-  const handleDelete = (id: string) => {
-    MySwal.fire({
+  const handleDelete = async (id: string) => {
+    const result = await MySwal.fire({
       title: 'Delete Task?',
-      text: 'Are you sure you want to delete this task?',
+      text: 'Are you sure you want to delete this task from the database?',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
       cancelButtonColor: '#9ca3af',
       confirmButtonText: 'Yes, delete'
-    }).then(result => {
-      if (result.isConfirmed) {
-        setTasks(tasks.filter(t => t.id !== id));
-        setSelectedTaskIds(selectedTaskIds.filter(item => item !== id));
-        MySwal.fire({ title: 'Deleted!', text: 'Task deleted successfully', icon: 'success', timer: 1200, showConfirmButton: false });
-      }
     });
+
+    if (result.isConfirmed) {
+      setTasks(prev => prev.filter(t => t.id !== id));
+      setSelectedTaskIds(prev => prev.filter(item => item !== id));
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          await api.delete(`/tasks/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+        }
+        MySwal.fire({ title: 'Deleted!', text: 'Task deleted successfully', icon: 'success', timer: 1200, showConfirmButton: false });
+      } catch (err) {
+        console.error('Failed to delete task', err);
+        fetchTasksData();
+      }
+    }
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (selectedTaskIds.length === 0) return;
-    MySwal.fire({
+    const result = await MySwal.fire({
       title: `Delete ${selectedTaskIds.length} Tasks?`,
-      text: 'Are you sure you want to delete all selected tasks?',
+      text: 'Are you sure you want to delete all selected tasks from the database?',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
       cancelButtonColor: '#9ca3af',
       confirmButtonText: 'Yes, delete all'
-    }).then(result => {
-      if (result.isConfirmed) {
-        setTasks(tasks.filter(t => !selectedTaskIds.includes(t.id)));
-        setSelectedTaskIds([]);
-        MySwal.fire({ title: 'Deleted!', text: 'Selected tasks deleted.', icon: 'success', timer: 1200, showConfirmButton: false });
-      }
     });
+
+    if (result.isConfirmed) {
+      const idsToDelete = [...selectedTaskIds];
+      setTasks(prev => prev.filter(t => !idsToDelete.includes(t.id)));
+      setSelectedTaskIds([]);
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          await api.post('/tasks/bulk-delete', { ids: idsToDelete }, { headers: { Authorization: `Bearer ${token}` } });
+        }
+        MySwal.fire({ title: 'Deleted!', text: 'Selected tasks deleted.', icon: 'success', timer: 1200, showConfirmButton: false });
+      } catch (err) {
+        console.error('Failed to bulk delete tasks', err);
+        fetchTasksData();
+      }
+    }
   };
 
   const handleExportCSV = () => {
@@ -362,7 +325,7 @@ export function TasksPage() {
   return (
     <div className="space-y-4">
       {/* Top Bar - 1:1 Matching LeadsPage Top Bar */}
-      <div className="bg-white p-3 rounded-md shadow-sm border border-gray-100 flex flex-wrap items-center justify-between gap-4 relative">
+      <div className="bg-white p-3 rounded-md border border-gray-100 flex flex-wrap items-center justify-between gap-4 relative">
         <h2 className="text-[15px] font-semibold text-gray-900">
           Available Tasks : {filteredTasks.length}
         </h2>
@@ -445,7 +408,7 @@ export function TasksPage() {
 
       {/* Filter Dropdown Row */}
       {showFilterDropdown && (
-        <div className="bg-white p-3 rounded-md shadow-sm border border-gray-100 flex flex-wrap items-center gap-3 animate-in fade-in duration-150">
+        <div className="bg-white p-3 rounded-md border border-gray-100 flex flex-wrap items-center gap-3 animate-in fade-in duration-150">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-gray-500">Status:</span>
             <select
@@ -500,8 +463,8 @@ export function TasksPage() {
       )}
 
       {/* Table - 1:1 Matching LeadsPage Table Structure */}
-      <div className="bg-white rounded-md shadow-sm border border-gray-100 overflow-visible">
-        <div className="overflow-x-auto overflow-y-visible min-h-[400px]">
+      <div className="bg-white rounded-md border border-gray-100 overflow-visible">
+        <div className="overflow-x-auto overflow-y-hidden">
           <table className="w-full text-sm text-left whitespace-nowrap">
             <thead className="text-[11px] font-bold text-gray-700 uppercase bg-gray-50 border-b border-gray-100 tracking-wider">
               <tr>
@@ -523,7 +486,7 @@ export function TasksPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {paginatedTasks.map((task) => (
-                <tr key={task.id} className="hover:bg-gray-50/50 group relative">
+                <tr key={task.id} className="hover:bg-gray-50/50 group relative group/row">
                   {/* Name Column with Checkbox, Star, Details */}
                   <td className="px-4 py-3 border-r border-gray-100">
                     <div className="flex items-center justify-between">
@@ -554,20 +517,45 @@ export function TasksPage() {
                           >
                             {task.title}
                           </span>
-                          <span className="text-xs text-gray-400 ml-2 font-normal">
-                            ({task.clientName})
-                          </span>
+                          {task.clientName && (
+                            task.leadId ? (
+                              <Link
+                                to={`/clients/${task.leadId}`}
+                                className="text-xs text-gray-400 ml-2 font-normal hover:text-blue-600 hover:underline cursor-pointer"
+                                title="Open 360° Client Profile"
+                              >
+                                ({task.clientName})
+                              </Link>
+                            ) : (
+                              <span className="text-xs text-gray-400 ml-2 font-normal">
+                                ({task.clientName})
+                              </span>
+                            )
+                          )}
 
                           {/* Hover Popover */}
-                          <div className="absolute left-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-xl opacity-0 invisible group-hover/name:opacity-100 group-hover/name:visible transition-all duration-200 z-[60] p-4 flex flex-col gap-2.5">
-                            <div className="absolute -top-1.5 left-4 w-3 h-3 bg-white border-t border-l border-gray-200 transform rotate-45"></div>
+                          <div className="hidden group-hover/name:flex absolute left-0 top-full mt-2 group-last/row:top-auto group-last/row:bottom-full group-last/row:mb-2 w-72 bg-white border border-gray-200 rounded-lg z-[60] p-4 flex-col gap-2.5">
+                            <div className="absolute -top-1.5 group-last/row:top-auto group-last/row:-bottom-1.5 left-4 w-3 h-3 bg-white border-t border-l group-last/row:border-t-0 group-last/row:border-l-0 group-last/row:border-b group-last/row:border-r border-gray-200 transform rotate-45"></div>
                             
-                            <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-                              <User className="w-4 h-4 text-indigo-600" />
-                              <span>{task.title}</span>
+                            <div className="flex items-center justify-between text-sm font-semibold text-gray-800">
+                              <div className="flex items-center gap-2">
+                                <User className="w-4 h-4 text-indigo-600" />
+                                <span>{task.title}</span>
+                              </div>
+                              {task.leadId && (
+                                <Link
+                                  to={`/clients/${task.leadId}`}
+                                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-0.5"
+                                  title="View 360° Profile"
+                                >
+                                  Profile <ExternalLink className="w-3 h-3" />
+                                </Link>
+                              )}
                             </div>
 
-                            <p className="text-xs text-gray-700 font-medium">Client: {task.clientName} ({task.companyName})</p>
+                            <p className="text-xs text-gray-700 font-medium">
+                              Client: {task.clientName || '-'} {task.companyName ? `(${task.companyName})` : ''}
+                            </p>
                             
                             <div className="text-xs text-gray-500 space-y-1 pt-1 border-t border-gray-100">
                               <p>Due: <strong>{formatDate(task.dueDateTime || task.dueDate, task.dueTime)}</strong></p>
@@ -576,10 +564,18 @@ export function TasksPage() {
                               {task.description && <p className="text-gray-600 italic mt-1">"{task.description}"</p>}
                             </div>
 
-                            <div className="mt-1">
+                            <div className="flex items-center justify-between mt-1 border-t border-gray-100 pt-2">
                               <span className="inline-block bg-slate-50 border border-slate-200 text-slate-600 text-[11px] px-2.5 py-0.5 rounded-full font-medium">
                                 {timeAgo(task.createdAt)}
                               </span>
+                              {task.leadId && (
+                                <Link
+                                  to={`/clients/${task.leadId}`}
+                                  className="text-[11px] font-semibold text-blue-600 hover:underline flex items-center gap-1"
+                                >
+                                  View 360° Profile <ExternalLink className="w-3 h-3" />
+                                </Link>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -635,7 +631,7 @@ export function TasksPage() {
 
                           {openMoreId === task.id && (
                             <div 
-                              className="absolute right-full mr-2 top-1/2 -translate-y-1/2 bg-white border border-gray-200 shadow-lg rounded-md p-1.5 flex items-center gap-1.5 z-50 animate-in fade-in zoom-in duration-150"
+                              className="absolute right-full mr-2 top-1/2 -translate-y-1/2 bg-white border border-gray-200 rounded-md p-1.5 flex items-center gap-1.5 z-50 animate-in fade-in zoom-in duration-150"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <button
@@ -797,37 +793,36 @@ export function TasksPage() {
           </table>
         </div>
 
-        {/* Pagination Controls - 1:1 Matching LeadsPage */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100 rounded-b-md">
-            <div className="text-xs text-gray-500">
-              Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, filteredTasks.length)} of {filteredTasks.length} tasks
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="h-8 px-2"
-              >
-                <ChevronLeft className="w-4 h-4 mr-1" /> Previous
-              </Button>
-              <span className="text-xs font-medium text-gray-700">
-                Page {currentPage} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="h-8 px-2"
-              >
-                Next <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </div>
+        {/* Pagination Toolbar - 1:1 Matching LeadsPage */}
+        <div className="p-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500 bg-white">
+          <div>
+            Showing {filteredTasks.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} to{' '}
+            {Math.min(currentPage * pageSize, filteredTasks.length)} of {filteredTasks.length} entries
           </div>
-        )}
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="h-8 px-2 text-xs"
+            >
+              <ChevronLeft className="w-3.5 h-3.5 mr-1" /> Prev
+            </Button>
+            <span className="px-2 text-xs font-medium text-gray-700">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages || filteredTasks.length === 0}
+              className="h-8 px-2 text-xs"
+            >
+              Next <ChevronRight className="w-3.5 h-3.5 ml-1" />
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* View Task Details Modal Component */}
@@ -846,17 +841,19 @@ export function TasksPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={async (newTask) => {
-          setTasks(prev => [newTask, ...prev]);
           try {
             const token = localStorage.getItem('token');
             if (token) {
+              const hostMember = availableMembers.find(m => m.name === newTask.assignedTo || m.email === newTask.assignedTo);
               await api.post('/tasks', {
                 title: newTask.title,
                 description: newTask.description,
-                dueDate: newTask.dueDate ? new Date(`${newTask.dueDate}T${newTask.dueTime || '14:00'}:00`).toISOString() : new Date().toISOString(),
+                dueDate: newTask.dueDateTime ? new Date(newTask.dueDateTime).toISOString() : new Date().toISOString(),
                 priority: newTask.priority?.toUpperCase() || 'MEDIUM',
-                status: 'PENDING'
+                status: newTask.status?.toUpperCase() || 'PENDING',
+                assignedToId: hostMember?.id
               }, { headers: { Authorization: `Bearer ${token}` } });
+              fetchTasksData();
             }
           } catch (e) {
             console.error('Failed to persist task', e);
@@ -873,8 +870,25 @@ export function TasksPage() {
           setSelectedTask(null);
         }}
         task={selectedTask}
-        onSave={(updatedTask) => {
-          setTasks(tasks.map(t => t.id === updatedTask.id ? updatedTask : t));
+        onSave={async (updatedTask) => {
+          setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+          try {
+            const token = localStorage.getItem('token');
+            if (token) {
+              const hostMember = availableMembers.find(m => m.name === updatedTask.assignedTo || m.email === updatedTask.assignedTo);
+              await api.put(`/tasks/${updatedTask.id}`, {
+                title: updatedTask.title,
+                description: updatedTask.description,
+                dueDate: updatedTask.dueDateTime ? new Date(updatedTask.dueDateTime).toISOString() : new Date().toISOString(),
+                priority: updatedTask.priority?.toUpperCase() || 'MEDIUM',
+                status: updatedTask.status?.toUpperCase() || 'PENDING',
+                assignedToId: hostMember?.id
+              }, { headers: { Authorization: `Bearer ${token}` } });
+              fetchTasksData();
+            }
+          } catch (e) {
+            console.error('Failed to update task', e);
+          }
         }}
         availableMembers={availableMembers}
       />

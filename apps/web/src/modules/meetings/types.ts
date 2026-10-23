@@ -15,6 +15,7 @@ export interface Meeting {
   status: string;
   priority?: string;
   agenda?: string;
+  leadId?: string;
   createdAt: string;
 }
 

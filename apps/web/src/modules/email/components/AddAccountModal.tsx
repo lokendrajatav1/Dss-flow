@@ -17,18 +17,16 @@ export function AddAccountModal({ isOpen, onClose, onConnect }: AddAccountModalP
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
         
-        let email = formData.get('email') as string;
-        if (!email) {
-            email = provider === 'gmail' ? 'user@gmail.com' : 'user@outlook.com';
-        }
+        const email = (formData.get('email') as string)?.trim() || '';
+        const accessToken = (formData.get('accessToken') as string)?.trim() || '';
 
         onConnect({
             provider: provider,
             email: email,
-            accessToken: formData.get('accessToken') as string || (provider === 'other' ? '' : 'mock_token_for_oauth'),
-            refreshToken: formData.get('refreshToken') as string,
-            imapHost: formData.get('imapHost') as string,
-            smtpHost: formData.get('smtpHost') as string,
+            accessToken: accessToken,
+            refreshToken: (formData.get('refreshToken') as string)?.trim() || '',
+            imapHost: (formData.get('imapHost') as string)?.trim() || '',
+            smtpHost: (formData.get('smtpHost') as string)?.trim() || '',
             syncEnabled: formData.get('syncEnabled') === 'on' || true,
             syncInterval: parseInt(formData.get('syncInterval') as string) || 300,
         });

@@ -11,7 +11,7 @@ interface VendorModalProps {
   isOpen: boolean;
   onClose: () => void;
   vendor?: any | null;
-  onSaved: () => void;
+  onSaved: (vendor?: any) => void;
 }
 
 const initialFormData = {

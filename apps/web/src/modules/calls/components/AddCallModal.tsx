@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { CALL_STATUSES } from '@/lib/constants';
 import { CallItem, CALL_DIRECTIONS, CALL_OUTCOMES } from '../types';
+import { EntityLookupInput, EntityLookupItem } from '@/components/common/EntityLookupInput';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 
@@ -24,14 +24,17 @@ interface AddCallModalProps {
 
 export function AddCallModal({ isOpen, onClose, onSave, availableMembers }: AddCallModalProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedEntity, setSelectedEntity] = useState<EntityLookupItem | null>(null);
+
   const [formData, setFormData] = useState({
+    leadId: undefined as string | undefined,
     name: '',
     companyName: '',
     phone: '',
     email: '',
     direction: 'Outbound',
     callStatus: 'Connected',
-    outcome: 'Interested',
+    outcome: '-None-',
     dateTime: getNowLocalDateTime(),
     durationMinutes: '05',
     durationSeconds: '00',
@@ -43,14 +46,16 @@ export function AddCallModal({ isOpen, onClose, onSave, availableMembers }: AddC
   useEffect(() => {
     if (isOpen) {
       setIsLoading(false);
+      setSelectedEntity(null);
       setFormData({
+        leadId: undefined,
         name: '',
         companyName: '',
         phone: '',
         email: '',
         direction: 'Outbound',
         callStatus: 'Connected',
-        outcome: 'Interested',
+        outcome: '-None-',
         dateTime: getNowLocalDateTime(),
         durationMinutes: '05',
         durationSeconds: '00',
@@ -60,6 +65,26 @@ export function AddCallModal({ isOpen, onClose, onSave, availableMembers }: AddC
       });
     }
   }, [isOpen, availableMembers]);
+
+  const handleSelectEntity = (item: EntityLookupItem | null) => {
+    setSelectedEntity(item);
+    if (item) {
+      setFormData(prev => ({
+        ...prev,
+        leadId: item.type === 'Lead' ? item.id : undefined,
+        name: item.name,
+        companyName: item.companyName || '',
+        phone: item.phone || '',
+        email: item.email || '',
+        assignedTo: (typeof item.assignedTo === 'string' ? item.assignedTo : item.assignedTo?.name) || prev.assignedTo
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        leadId: undefined
+      }));
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -79,6 +104,7 @@ export function AddCallModal({ isOpen, onClose, onSave, availableMembers }: AddC
 
     const newCall: CallItem = {
       id: `c-${Date.now()}`,
+      leadId: formData.leadId,
       name: formData.name,
       companyName: formData.companyName || 'Direct Contact',
       phone: formData.phone,
@@ -94,9 +120,6 @@ export function AddCallModal({ isOpen, onClose, onSave, availableMembers }: AddC
       dateTime: dt
     };
 
-    // Clean loading state UX
-    await new Promise(resolve => setTimeout(resolve, 400));
-
     try {
       await onSave(newCall);
       onClose();
@@ -108,10 +131,13 @@ export function AddCallModal({ isOpen, onClose, onSave, availableMembers }: AddC
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-xl animate-in fade-in zoom-in duration-200">
+      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col border border-gray-200 animate-in fade-in zoom-in duration-200">
         {/* Modal Header */}
         <div className="flex-none flex items-center justify-between p-4 border-b border-gray-100 bg-white rounded-t-2xl z-20">
-          <h2 className="text-xl font-semibold text-gray-900">Add New Call Log</h2>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Add New Call Log</h2>
+            <p className="text-xs text-gray-500">Quickly search Lead or Contact to auto-fill call details</p>
+          </div>
           <button onClick={onClose} disabled={isLoading} className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50">
             <X className="w-5 h-5" />
           </button>
@@ -119,23 +145,35 @@ export function AddCallModal({ isOpen, onClose, onSave, availableMembers }: AddC
 
         {/* Modal Body */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto p-4 bg-gray-50/50 space-y-3">
+          <div className="flex-1 overflow-y-auto p-4 bg-gray-50/50 space-y-4">
+            
+            {/* Related Entity Selector: [ Lead ▾ | Search Input | 🔍 ] (Matching Screenshot) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-1.5">
+                Related To
+              </label>
+              <EntityLookupInput
+                onSelect={handleSelectEntity}
+                selectedItem={selectedEntity}
+              />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-1">Contact Name *</label>
-                <Input 
-                  required 
-                  placeholder="Enter Contact Name" 
-                  value={formData.name} 
-                  onChange={e => setFormData({ ...formData, name: e.target.value })} 
+                <Input
+                  required
+                  placeholder="Enter Contact Name"
+                  value={formData.name}
+                  onChange={e => setFormData({ ...formData, name: e.target.value })}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-1">Company Name</label>
-                <Input 
-                  placeholder="Company Name" 
-                  value={formData.companyName} 
-                  onChange={e => setFormData({ ...formData, companyName: e.target.value })} 
+                <Input
+                  placeholder="Company Name"
+                  value={formData.companyName}
+                  onChange={e => setFormData({ ...formData, companyName: e.target.value })}
                 />
               </div>
             </div>
@@ -143,27 +181,27 @@ export function AddCallModal({ isOpen, onClose, onSave, availableMembers }: AddC
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-1">Phone Number *</label>
-                <Input 
-                  required 
-                  placeholder="+91 98765 43210" 
-                  value={formData.phone} 
-                  onChange={e => setFormData({ ...formData, phone: e.target.value })} 
+                <Input
+                  required
+                  placeholder="+91 98765 43210"
+                  value={formData.phone}
+                  onChange={e => setFormData({ ...formData, phone: e.target.value })}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-1">Email Address</label>
-                <Input 
-                  type="email" 
-                  placeholder="contact@company.com" 
-                  value={formData.email} 
-                  onChange={e => setFormData({ ...formData, email: e.target.value })} 
+                <Input
+                  type="email"
+                  placeholder="contact@company.com"
+                  value={formData.email}
+                  onChange={e => setFormData({ ...formData, email: e.target.value })}
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">Direction</label>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Call Type</label>
                 <select
                   value={formData.direction}
                   onChange={e => setFormData({ ...formData, direction: e.target.value })}
@@ -173,17 +211,7 @@ export function AddCallModal({ isOpen, onClose, onSave, availableMembers }: AddC
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">Call Status</label>
-                <select
-                  value={formData.callStatus}
-                  onChange={e => setFormData({ ...formData, callStatus: e.target.value })}
-                  className="w-full h-10 px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-0 focus:border-gray-300 text-sm bg-white cursor-pointer"
-                >
-                  {CALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">Call Outcome</label>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Call Result</label>
                 <select
                   value={formData.outcome}
                   onChange={e => setFormData({ ...formData, outcome: e.target.value })}
@@ -195,14 +223,13 @@ export function AddCallModal({ isOpen, onClose, onSave, availableMembers }: AddC
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* Single combined Date field */}
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-1">Date</label>
-                <input 
-                  type="datetime-local" 
-                  required 
-                  value={formData.dateTime} 
-                  onChange={e => setFormData({ ...formData, dateTime: e.target.value })} 
+                <input
+                  type="datetime-local"
+                  required
+                  value={formData.dateTime}
+                  onChange={e => setFormData({ ...formData, dateTime: e.target.value })}
                   className="w-full h-10 px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-0 focus:border-gray-300 text-sm bg-white cursor-pointer"
                 />
               </div>
@@ -210,21 +237,21 @@ export function AddCallModal({ isOpen, onClose, onSave, availableMembers }: AddC
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-1">Duration (Min : Sec)</label>
                 <div className="flex items-center gap-1.5">
-                  <Input 
-                    type="number" 
-                    min="0" 
-                    placeholder="05" 
-                    value={formData.durationMinutes} 
-                    onChange={e => setFormData({ ...formData, durationMinutes: e.target.value })} 
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="05"
+                    value={formData.durationMinutes}
+                    onChange={e => setFormData({ ...formData, durationMinutes: e.target.value })}
                   />
                   <span className="text-gray-400 font-bold">:</span>
-                  <Input 
-                    type="number" 
-                    min="0" 
-                    max="59" 
-                    placeholder="00" 
-                    value={formData.durationSeconds} 
-                    onChange={e => setFormData({ ...formData, durationSeconds: e.target.value })} 
+                  <Input
+                    type="number"
+                    min="0"
+                    max="59"
+                    placeholder="00"
+                    value={formData.durationSeconds}
+                    onChange={e => setFormData({ ...formData, durationSeconds: e.target.value })}
                   />
                 </div>
               </div>
@@ -260,17 +287,17 @@ export function AddCallModal({ isOpen, onClose, onSave, availableMembers }: AddC
 
           {/* Modal Footer */}
           <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-100 bg-white rounded-b-2xl">
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               onClick={onClose}
               disabled={isLoading}
               className="px-4 h-10 rounded-md text-sm"
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={isLoading}
               className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[130px] h-10 px-5 rounded-md font-medium text-sm flex items-center justify-center gap-2"
             >
@@ -292,3 +319,5 @@ export function AddCallModal({ isOpen, onClose, onSave, availableMembers }: AddC
     </div>
   );
 }
+
+export default AddCallModal;

@@ -109,7 +109,7 @@ export function EditMeetingModal({ isOpen, onClose, meeting, onSave, availableMe
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-xl animate-in fade-in zoom-in duration-200">
+      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col border border-gray-200 animate-in fade-in zoom-in duration-200">
         {/* Modal Header */}
         <div className="flex-none flex items-center justify-between p-4 border-b border-gray-100 bg-white rounded-t-2xl z-20">
           <h2 className="text-xl font-semibold text-gray-900">Edit Scheduled Meeting</h2>

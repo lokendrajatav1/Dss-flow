@@ -1,4 +1,5 @@
-import { Video, Phone, Mail, Bell, X, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Video, Phone, Mail, Bell, X, ExternalLink, User } from 'lucide-react';
 import { Meeting } from '../types';
 
 interface ViewMeetingModalProps {
@@ -44,7 +45,7 @@ export function ViewMeetingModal({ isOpen, onClose, meeting, onSetReminder }: Vi
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-      <div className="bg-white rounded-xl w-full max-w-lg shadow-xl border border-gray-200 overflow-hidden flex flex-col">
+      <div className="bg-white rounded-xl w-full max-w-lg border border-gray-200 overflow-hidden flex flex-col">
         
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
@@ -80,7 +81,20 @@ export function ViewMeetingModal({ isOpen, onClose, meeting, onSetReminder }: Vi
               <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block">
                 Client
               </span>
-              <p className="text-gray-900 font-medium mt-1">{meeting.clientName || '-'}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-gray-900 font-medium">{meeting.clientName || '-'}</p>
+                {meeting.leadId && (
+                  <Link
+                    to={`/clients/${meeting.leadId}`}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2 py-0.5 rounded transition-colors"
+                    title="Open 360° Profile"
+                  >
+                    <User className="w-3 h-3" />
+                    <span>360° Profile</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </Link>
+                )}
+              </div>
             </div>
             <div>
               <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider block">
@@ -211,13 +225,24 @@ export function ViewMeetingModal({ isOpen, onClose, meeting, onSetReminder }: Vi
             <span>Set Reminder</span>
           </button>
           
-          <button
-            type="button"
-            onClick={onClose}
-            className="bg-white hover:bg-gray-100 text-gray-700 font-medium text-xs px-4 py-2 rounded-md transition-colors border border-gray-300 shadow-2xs"
-          >
-            Close
-          </button>
+          <div className="flex items-center gap-2">
+            {meeting.leadId && (
+              <Link
+                to={`/clients/${meeting.leadId}`}
+                className="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-3.5 py-2 rounded-md transition-colors"
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>Full 360° Profile</span>
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="bg-white hover:bg-gray-100 text-gray-700 font-medium text-xs px-4 py-2 rounded-md transition-colors border border-gray-300"
+            >
+              Close
+            </button>
+          </div>
         </div>
 
       </div>

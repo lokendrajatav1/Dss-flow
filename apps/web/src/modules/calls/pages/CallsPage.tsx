@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import {
-  Filter, FileText, RefreshCw, Trash2, Search, MoreVertical,
-  Star, Eye, Edit, Bell, Phone, Mail,
-  ChevronLeft, ChevronRight, User, ArrowUpRight, ArrowDownLeft
+  Plus, Filter, FileText, RefreshCw, Trash2, Search,
+  Star, Eye, Edit, Bell, Phone, Mail, User, ExternalLink,
+  ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownLeft, PhoneMissed,
+  Copy, Check, Volume2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { CALL_STATUSES, CALL_DIRECTIONS, CALL_OUTCOMES } from '@/lib/constants';
+import { CALL_DIRECTIONS, CALL_OUTCOMES, CALL_TYPES, CALL_RESULTS } from '@/lib/constants';
 import api from '@/lib/api';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
@@ -14,14 +16,8 @@ import { CallItem } from '../types';
 import { AddCallModal } from '../components/AddCallModal';
 import { EditCallModal } from '../components/EditCallModal';
 import { ViewCallModal } from '../components/ViewCallModal';
-import {
-  PAGE_SIZES,
-  DEFAULT_FILTERS,
-  LEGACY_MOCK_CALL_IDS,
-  DEFAULT_CALL_DURATIONS,
-  DEFAULT_CALL_OUTCOMES,
-  CALLS_STORAGE_KEY
-} from '../constants';
+import { useDialer } from '@/context/TelephonyContext';
+import { PAGE_SIZES, DEFAULT_FILTERS } from '../constants';
 
 const MySwal = withReactContent(Swal);
 
@@ -40,22 +36,45 @@ export const timeAgo = (dateStr: string) => {
   return `${Math.floor(diff / 86400)} days ago`;
 };
 
-const INITIAL_CALLS: CallItem[] = [];
+const getStatusBadgeClass = (status: string) => {
+  switch (status) {
+    case 'Connected':
+      return 'bg-emerald-50 text-emerald-700';
+    case 'Callback Scheduled':
+      return 'bg-purple-50 text-purple-700';
+    case 'Busy':
+      return 'bg-amber-50 text-amber-700';
+    case 'No Answer':
+    case 'Not Answered':
+      return 'bg-rose-50 text-rose-700';
+    case 'Left Voicemail':
+      return 'bg-indigo-50 text-indigo-700';
+    default:
+      return 'bg-gray-50 text-gray-700';
+  }
+};
+
+const getOutcomeBadgeClass = (outcome: string) => {
+  switch (outcome) {
+    case 'Interested':
+    case 'Closed Won':
+      return 'bg-emerald-50 text-emerald-700';
+    case 'Follow-up Required':
+      return 'bg-indigo-50 text-indigo-700';
+    case 'Not Interested':
+    case 'Closed Lost':
+      return 'bg-rose-50 text-rose-700';
+    case 'Left Voicemail':
+      return 'bg-purple-50 text-purple-700';
+    default:
+      return 'bg-gray-50 text-gray-700';
+  }
+};
 
 export function CallsPage() {
-  const [calls, setCalls] = useState<CallItem[]>(() => {
-    const saved = localStorage.getItem(CALLS_STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Exclude legacy mock call records
-        const filtered = Array.isArray(parsed) ? parsed.filter(c => !LEGACY_MOCK_CALL_IDS.includes(c.id)) : [];
-        return filtered;
-      } catch (e) { /* ignore */ }
-    }
-    return INITIAL_CALLS;
-  });
-
+  const [calls, setCalls] = useState<CallItem[]>([]);
+  const [totalCalls, setTotalCalls] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,15 +82,15 @@ export function CallsPage() {
   const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[0]);
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [openMoreId, setOpenMoreId] = useState<string | null>(null);
+  const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
 
   // Filters
-  const [directionFilter, setDirectionFilter] = useState(DEFAULT_FILTERS.direction);
-  const [statusFilter, setStatusFilter] = useState(DEFAULT_FILTERS.status);
-  const [outcomeFilter, setOutcomeFilter] = useState(DEFAULT_FILTERS.outcome);
-  const [assignedToFilter, setAssignedToFilter] = useState(DEFAULT_FILTERS.assignedTo);
+  const [directionFilter, setDirectionFilter] = useState<string>(DEFAULT_FILTERS.direction);
+  const [outcomeFilter, setOutcomeFilter] = useState<string>(DEFAULT_FILTERS.outcome);
+  const [assignedToFilter, setAssignedToFilter] = useState<string>(DEFAULT_FILTERS.assignedTo);
 
   // Modals state
+  const { startCall } = useDialer();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -80,21 +99,12 @@ export function CallsPage() {
   const [selectedLead, setSelectedLead] = useState<any>(null);
 
   useEffect(() => {
-    localStorage.setItem(CALLS_STORAGE_KEY, JSON.stringify(calls));
-  }, [calls]);
-
-  useEffect(() => {
-    const handleClickOutside = () => {
-      setOpenMoreId(null);
-    };
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
-
-  useEffect(() => {
     fetchTeamMembers();
-    fetchCallsData();
   }, []);
+
+  useEffect(() => {
+    fetchCallsData();
+  }, [currentPage, pageSize, searchQuery, directionFilter, outcomeFilter, assignedToFilter]);
 
   const fetchTeamMembers = async () => {
     try {
@@ -115,83 +125,27 @@ export function CallsPage() {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const [leadsRes, activitiesRes] = await Promise.allSettled([
-        api.get('/leads', { headers: { Authorization: `Bearer ${token}` } }),
-        api.get('/activities', { headers: { Authorization: `Bearer ${token}` } })
-      ]);
+      const params: any = {
+        page: currentPage,
+        limit: pageSize
+      };
+      if (searchQuery.trim()) params.search = searchQuery.trim();
+      if (directionFilter !== 'all') params.direction = directionFilter;
+      if (outcomeFilter !== 'all') params.outcome = outcomeFilter;
+      if (assignedToFilter !== 'all') params.agentId = assignedToFilter;
 
-      const leads = leadsRes.status === 'fulfilled' && Array.isArray(leadsRes.value.data) ? leadsRes.value.data : [];
-      const activities = activitiesRes.status === 'fulfilled' && Array.isArray(activitiesRes.value.data) ? activitiesRes.value.data : [];
+      const res = await api.get('/calls', {
+        params,
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
-      const fetchedCalls: CallItem[] = [];
-
-      // 1. Process Activity log records (type: 'CALL')
-      activities
-        .filter((act: any) => act.type === 'CALL')
-        .forEach((act: any) => {
-          const lead = act.lead || {};
-          let status = 'Connected';
-          if (act.title?.includes('Busy')) status = 'Busy';
-          else if (act.title?.includes('No Answer')) status = 'No Answer';
-          else if (act.title?.includes('Left Voicemail')) status = 'Left Voicemail';
-          else if (act.title?.includes('Interested')) status = 'Interested';
-          else if (act.title?.includes('Follow Up')) status = 'Follow Up Needed';
-          else if (lead.callStatus) status = lead.callStatus;
-
-          fetchedCalls.push({
-            id: `act-call-${act.id}`,
-            leadId: lead.id || act.leadId || undefined,
-            name: lead.name || act.metadata?.name || 'Contact',
-            companyName: lead.companyName || act.metadata?.companyName || 'Lead Organization',
-            phone: lead.phone || lead.whatsappNumber || act.metadata?.phone || '',
-            email: lead.email || '',
-            direction: act.metadata?.direction || 'Outbound',
-            callStatus: status,
-            outcome: status === 'Interested' ? 'Interested' : (status === 'Connected' ? 'Follow-up Required' : 'Busy'),
-            duration: act.metadata?.duration || '03:15',
-            assignedTo: act.performedBy?.name || 'Unassigned',
-            notes: act.description || act.title || 'Logged call activity.',
-            priority: 'Normal',
-            createdAt: act.createdAt || new Date().toISOString(),
-            dateTime: act.metadata?.activityDate ? act.metadata.activityDate.slice(0, 16) : act.createdAt?.slice(0, 16)
-          });
-        });
-
-      // 2. Process Leads that have an active callStatus
-      leads
-        .filter((l: any) => l.callStatus && l.callStatus !== 'Untouched')
-        .forEach((l: any) => {
-          const alreadyLogged = fetchedCalls.some(c => c.phone && c.phone === l.phone);
-          if (!alreadyLogged) {
-            fetchedCalls.push({
-              id: `lead-call-${l.id}`,
-              leadId: l.id,
-              name: l.name || l.title || 'Lead Contact',
-              companyName: l.companyName || 'Lead Organization',
-              phone: l.phone || l.whatsappNumber || '',
-              email: l.email || '',
-              direction: 'Outbound',
-              callStatus: l.callStatus || 'Connected',
-              outcome: l.feedback?.includes('Interested') || l.callStatus === 'Interested' ? 'Interested' : 'Follow-up Required',
-              duration: '03:30',
-              assignedTo: l.assignedTo?.name || 'Unassigned',
-              notes: l.notes || l.feedback || 'Logged via CRM Leads Pipeline.',
-              priority: l.priority === 'High' || l.priority === 'Urgent' ? 'High' : 'Normal',
-              createdAt: l.updatedAt || new Date().toISOString(),
-              dateTime: l.updatedAt ? l.updatedAt.slice(0, 16) : undefined
-            });
-          }
-        });
-
-      if (fetchedCalls.length > 0) {
-        setCalls(prev => {
-          const fetchedIds = new Set(fetchedCalls.map(c => c.id));
-          const localOnly = prev.filter(c => !fetchedIds.has(c.id) && !c.id.startsWith('lead-call-') && !c.id.startsWith('act-call-'));
-          return [...fetchedCalls, ...localOnly];
-        });
+      if (res.data?.calls) {
+        setCalls(res.data.calls);
+        setTotalCalls(res.data.pagination?.total || res.data.calls.length);
+        setTotalPages(res.data.pagination?.totalPages || 1);
       }
     } catch (err) {
-      // Graceful fallback
+      console.error('Failed to fetch calls:', err);
     } finally {
       setLoading(false);
     }
@@ -199,40 +153,13 @@ export function CallsPage() {
 
   const availableMembers = teamMembers;
 
-  // Memoized filtered calls calculation
-  const filteredCalls = useMemo(() => {
-    return calls.filter(c => {
-      const q = searchQuery.toLowerCase();
-      const matchesSearch =
-        c.name.toLowerCase().includes(q) ||
-        c.companyName.toLowerCase().includes(q) ||
-        c.phone.includes(q) ||
-        c.assignedTo.toLowerCase().includes(q) ||
-        c.notes.toLowerCase().includes(q);
-
-      const matchesDirection = directionFilter === 'all' || c.direction === directionFilter;
-      const matchesStatus = statusFilter === 'all' || c.callStatus === statusFilter;
-      const matchesOutcome = outcomeFilter === 'all' || c.outcome === outcomeFilter;
-      const matchesAssignee = assignedToFilter === 'all' || c.assignedTo === assignedToFilter;
-
-      return matchesSearch && matchesDirection && matchesStatus && matchesOutcome && matchesAssignee;
-    });
-  }, [calls, searchQuery, directionFilter, statusFilter, outcomeFilter, assignedToFilter]);
-
-  // Pagination Logic
-  const totalPages = Math.max(1, Math.ceil(filteredCalls.length / pageSize));
-  const paginatedCalls = useMemo(() => {
-    return filteredCalls.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  }, [filteredCalls, currentPage, pageSize]);
-
-  // Memoized event handlers
   const handleSelectAll = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedCallIds(paginatedCalls.map(c => c.id));
+      setSelectedCallIds(calls.map(c => c.id));
     } else {
       setSelectedCallIds([]);
     }
-  }, [paginatedCalls]);
+  }, [calls]);
 
   const handleSelectCall = useCallback((id: string, checked: boolean) => {
     if (checked) {
@@ -245,16 +172,14 @@ export function CallsPage() {
   const togglePriority = useCallback((call: CallItem) => {
     const nextPriority = call.priority === 'High' ? 'Normal' : 'High';
     setCalls(prev => prev.map(c => c.id === call.id ? { ...c, priority: nextPriority } : c));
-  }, [setCalls]);
+  }, []);
 
   const updateCallStatus = async (id: string, newStatus: string) => {
     setCalls(prev => prev.map(c => c.id === id ? { ...c, callStatus: newStatus } : c));
     try {
       const token = localStorage.getItem('token');
-      const target = calls.find(c => c.id === id);
-      const leadId = target?.leadId || (id.startsWith('lead-call-') ? id.replace('lead-call-', '') : null);
-      if (leadId && token) {
-        await api.put(`/leads/${leadId}`, { callStatus: newStatus }, { headers: { Authorization: `Bearer ${token}` } });
+      if (token) {
+        await api.put(`/calls/${id}`, { callStatus: newStatus }, { headers: { Authorization: `Bearer ${token}` } });
       }
     } catch (e) {
       console.warn('Failed to persist call status:', e);
@@ -263,18 +188,22 @@ export function CallsPage() {
   };
 
   const updateCallOutcome = async (id: string, newOutcome: string) => {
+    const call = calls.find(c => c.id === id);
     setCalls(prev => prev.map(c => c.id === id ? { ...c, outcome: newOutcome } : c));
     try {
       const token = localStorage.getItem('token');
-      const target = calls.find(c => c.id === id);
-      const leadId = target?.leadId || (id.startsWith('lead-call-') ? id.replace('lead-call-', '') : null);
-      if (leadId && token) {
-        await api.put(`/leads/${leadId}`, { feedback: newOutcome }, { headers: { Authorization: `Bearer ${token}` } });
+      if (token) {
+        await api.put(`/calls/${id}`, { outcome: newOutcome }, { headers: { Authorization: `Bearer ${token}` } });
       }
     } catch (e) {
       console.warn('Failed to persist outcome:', e);
     }
-    MySwal.fire({ title: 'Updated!', text: `Call outcome set to ${newOutcome}`, icon: 'success', timer: 1000, showConfirmButton: false });
+
+    if (newOutcome === 'Requested call back' && call) {
+      openReminderForCall(call);
+    } else {
+      MySwal.fire({ title: 'Updated!', text: `Call result set to "${newOutcome}"`, icon: 'success', timer: 1000, showConfirmButton: false });
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -291,15 +220,15 @@ export function CallsPage() {
     if (result.isConfirmed) {
       try {
         const token = localStorage.getItem('token');
-        if (id.startsWith('act-call-') && token) {
-          const actId = id.replace('act-call-', '');
-          await api.delete(`/activities/${actId}`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => { });
+        if (token) {
+          await api.delete(`/calls/${id}`, { headers: { Authorization: `Bearer ${token}` } });
         }
       } catch (e) {
         console.warn('Delete backend error:', e);
       }
       setCalls(calls.filter(c => c.id !== id));
       setSelectedCallIds(selectedCallIds.filter(item => item !== id));
+      setTotalCalls(prev => Math.max(0, prev - 1));
       MySwal.fire({ title: 'Deleted!', text: 'Call log deleted successfully', icon: 'success', timer: 1200, showConfirmButton: false });
     }
   };
@@ -314,9 +243,18 @@ export function CallsPage() {
       confirmButtonColor: '#ef4444',
       cancelButtonColor: '#9ca3af',
       confirmButtonText: 'Yes, delete all'
-    }).then(result => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
+        try {
+          const token = localStorage.getItem('token');
+          if (token) {
+            await api.post('/calls/bulk-delete', { ids: selectedCallIds }, { headers: { Authorization: `Bearer ${token}` } });
+          }
+        } catch (e) {
+          console.warn('Bulk delete error:', e);
+        }
         setCalls(calls.filter(c => !selectedCallIds.includes(c.id)));
+        setTotalCalls(prev => Math.max(0, prev - selectedCallIds.length));
         setSelectedCallIds([]);
         MySwal.fire({ title: 'Deleted!', text: 'Selected call records deleted.', icon: 'success', timer: 1200, showConfirmButton: false });
       }
@@ -324,14 +262,13 @@ export function CallsPage() {
   };
 
   const handleExportCSV = () => {
-    const headers = ['Contact Name', 'Company', 'Phone', 'Email', 'Direction', 'Call Status', 'Outcome', 'Duration', 'Agent', 'Date'];
-    const rows = filteredCalls.map(c => [
+    const headers = ['Contact Name', 'Company', 'Phone', 'Email', 'Call Type', 'Call Result', 'Duration', 'Agent', 'Date'];
+    const rows = calls.map(c => [
       `"${c.name}"`,
       `"${c.companyName}"`,
       `"${c.phone}"`,
       `"${c.email || ''}"`,
       `"${c.direction}"`,
-      `"${c.callStatus}"`,
       `"${c.outcome}"`,
       `"${c.duration}"`,
       `"${c.assignedTo}"`,
@@ -347,16 +284,23 @@ export function CallsPage() {
     document.body.removeChild(link);
   };
 
+  const handleCopyPhone = (phone: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(phone);
+    setCopiedPhone(phone);
+    setTimeout(() => setCopiedPhone(null), 1500);
+  };
+
   const openReminderForCall = (call: CallItem) => {
-    const rawId = call.leadId || (call.id.startsWith('lead-call-') ? call.id.replace('lead-call-', '') : call.id);
+    const rawId = call.leadId || call.id;
     const leadObj = {
       id: rawId,
       name: call.name,
-      title: `Call: ${call.name}`,
+      title: call.name,
       companyName: call.companyName,
       phone: call.phone,
       email: call.email,
-      callStatus: call.callStatus || 'Connected',
+      callStatus: call.callStatus || '',
       notes: call.notes || '',
       nextFollowUp: call.nextFollowUp ? new Date(call.nextFollowUp).toISOString() : (call.dateTime ? new Date(call.dateTime).toISOString() : undefined),
       assignedToId: call.assignedTo
@@ -366,7 +310,7 @@ export function CallsPage() {
     setIsReminderModalOpen(true);
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
     try {
       const d = new Date(dateString);
@@ -377,13 +321,12 @@ export function CallsPage() {
     }
   };
 
-
   return (
     <div className="space-y-4">
-      {/* Top Bar - 1:1 Matching LeadsPage Top Bar */}
-      <div className="bg-white p-3 rounded-md shadow-sm border border-gray-100 flex flex-wrap items-center justify-between gap-4 relative">
+      {/* Top Bar - 1:1 Matching LeadsPage / Other Pages */}
+      <div className="bg-white p-3 rounded-md border border-gray-100 flex flex-wrap items-center justify-between gap-4 relative">
         <h2 className="text-[15px] font-semibold text-gray-900">
-          Available Calls : {filteredCalls.length}
+          Available Calls : {totalCalls}
         </h2>
 
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -455,24 +398,24 @@ export function CallsPage() {
             }}
             className="h-9 border border-gray-200 rounded-md px-2 text-sm outline-none focus:border-blue-500 bg-white cursor-pointer"
           >
-            {PAGE_SIZES.map(size => (
-              <option key={size} value={size}>{size}</option>
-            ))}
+            <option value={10}>10</option>
+            <option value={25}>25</option>
+            <option value={50}>50</option>
           </select>
         </div>
       </div>
 
       {/* Filter Dropdown Row */}
       {showFilterDropdown && (
-        <div className="bg-white p-3 rounded-md shadow-sm border border-gray-100 flex flex-wrap items-center gap-3 animate-in fade-in duration-150">
+        <div className="bg-white p-3 rounded-md border border-gray-100 flex flex-wrap items-center gap-3 animate-in fade-in duration-150">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-gray-500">Direction:</span>
+            <span className="text-xs font-medium text-gray-500">Call Type:</span>
             <select
               value={directionFilter}
               onChange={(e) => { setDirectionFilter(e.target.value); setCurrentPage(1); }}
               className="h-8 border border-gray-200 rounded px-2 text-xs outline-none bg-white cursor-pointer"
             >
-              <option value="all">All Directions</option>
+              <option value="all">All Call Types</option>
               {CALL_DIRECTIONS.map(d => (
                 <option key={d} value={d}>{d}</option>
               ))}
@@ -480,52 +423,39 @@ export function CallsPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-gray-500">Status:</span>
-            <select
-              value={statusFilter}
-              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-              className="h-8 border border-gray-200 rounded px-2 text-xs outline-none bg-white cursor-pointer"
-            >
-              <option value="all">All Statuses</option>
-              {CALL_STATUSES.map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-gray-500">Outcome:</span>
+            <span className="text-xs font-medium text-gray-500">Call Result:</span>
             <select
               value={outcomeFilter}
               onChange={(e) => { setOutcomeFilter(e.target.value); setCurrentPage(1); }}
               className="h-8 border border-gray-200 rounded px-2 text-xs outline-none bg-white cursor-pointer"
             >
-              <option value="all">All Outcomes</option>
+              <option value="all">All Call Results</option>
               {CALL_OUTCOMES.map(o => (
                 <option key={o} value={o}>{o}</option>
               ))}
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-gray-500">Assignee:</span>
-            <select
-              value={assignedToFilter}
-              onChange={(e) => { setAssignedToFilter(e.target.value); setCurrentPage(1); }}
-              className="h-8 border border-gray-200 rounded px-2 text-xs outline-none bg-white cursor-pointer"
-            >
-              <option value="all">All Team Members</option>
-              {availableMembers.map((m: any) => (
-                <option key={m.id} value={m.name || m.email}>{m.name || m.email}</option>
-              ))}
-            </select>
-          </div>
+          {availableMembers.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-gray-500">Assignee:</span>
+              <select
+                value={assignedToFilter}
+                onChange={(e) => { setAssignedToFilter(e.target.value); setCurrentPage(1); }}
+                className="h-8 border border-gray-200 rounded px-2 text-xs outline-none bg-white cursor-pointer"
+              >
+                <option value="all">All Team Members</option>
+                {availableMembers.map((m: any) => (
+                  <option key={m.id} value={m.id}>{m.name || m.email}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
-          {(directionFilter !== 'all' || statusFilter !== 'all' || outcomeFilter !== 'all' || assignedToFilter !== 'all') && (
+          {(directionFilter !== 'all' || outcomeFilter !== 'all' || assignedToFilter !== 'all') && (
             <button
               onClick={() => {
                 setDirectionFilter('all');
-                setStatusFilter('all');
                 setOutcomeFilter('all');
                 setAssignedToFilter('all');
               }}
@@ -537,11 +467,11 @@ export function CallsPage() {
         </div>
       )}
 
-      {/* Table - 1:1 Matching LeadsPage Table Structure */}
-      <div className="bg-white rounded-md shadow-sm border border-gray-100 overflow-visible">
-        <div className="overflow-x-auto overflow-y-visible min-h-[400px]">
+      {/* Table - 1:1 Matching Structure & Styling of Other CRM Pages */}
+      <div className="bg-white rounded-md border border-gray-100 overflow-visible">
+        <div className="overflow-x-auto overflow-y-hidden">
           <table className="w-full text-sm text-left whitespace-nowrap">
-            <thead className="text-[11px] font-bold text-gray-700 uppercase bg-gray-50 border-b border-gray-100 tracking-wider">
+            <thead className="text-[11px] font-bold text-gray-700 uppercase bg-gray-100 border-b border-gray-200 tracking-wider">
               <tr>
                 <th className="px-4 py-3 w-[26%]">
                   <div className="flex items-center gap-3">
@@ -549,210 +479,105 @@ export function CallsPage() {
                       type="checkbox"
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                       onChange={handleSelectAll}
-                      checked={paginatedCalls.length > 0 && paginatedCalls.every(c => selectedCallIds.includes(c.id))}
+                      checked={calls.length > 0 && calls.every(c => selectedCallIds.includes(c.id))}
                     />
                     NAME
                   </div>
                 </th>
-                <th className="px-3 py-3 text-center">DIRECTION</th>
-                <th className="px-3 py-3 text-center">CALL STATUS</th>
-                <th className="px-3 py-3 text-center">OUTCOME</th>
+                <th className="px-3 py-3">PHONE</th>
+                <th className="px-3 py-3 text-center">CALL TYPE</th>
+                <th className="px-3 py-3 text-center">CALL RESULT</th>
                 <th className="px-3 py-3 text-center">DURATION</th>
                 <th className="px-4 py-3 text-center">DATE & TIME ↓</th>
+                <th className="px-3 py-3 text-center">RECORDING</th>
                 <th className="px-4 py-3 text-center">QUICK ACTION</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {paginatedCalls.map((call) => (
+              {calls.map((call) => (
                 <tr key={call.id} className="hover:bg-gray-50/50 group relative">
-                  {/* Name Column with Checkbox, Star, Details */}
-                  <td className="px-4 py-3 border-r border-gray-100">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                          checked={selectedCallIds.includes(call.id)}
-                          onChange={(e) => handleSelectCall(call.id, e.target.checked)}
+                  {/* Name Column */}
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        checked={selectedCallIds.includes(call.id)}
+                        onChange={(e) => handleSelectCall(call.id, e.target.checked)}
+                      />
+                      <span
+                        title={call.priority === 'High' ? 'High Priority' : 'Mark as High Priority'}
+                        onClick={(e) => { e.stopPropagation(); togglePriority(call); }}
+                        className="inline-flex cursor-pointer"
+                      >
+                        <Star
+                          className={`w-4 h-4 transition-colors ${call.priority === 'High' ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400 hover:text-yellow-400'}`}
                         />
-                        <span
-                          title={call.priority === 'High' ? 'High Priority' : 'Mark as High Priority'}
-                          onClick={(e) => { e.stopPropagation(); togglePriority(call); }}
-                          className="inline-flex cursor-pointer"
+                      </span>
+
+                      {call.leadId ? (
+                        <Link
+                          to={`/clients/${call.leadId}`}
+                          className="text-gray-900 font-medium hover:text-blue-600 hover:underline cursor-pointer"
+                          title="Open 360° Client Profile"
                         >
-                          <Star
-                            className={`w-4 h-4 transition-colors ${call.priority === 'High' ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400 hover:text-yellow-400'}`}
-                          />
-                        </span>
-
-                        <div className="relative group/name">
-                          <span
-                            onClick={() => {
-                              setSelectedCall(call);
-                              setIsViewModalOpen(true);
-                            }}
-                            className="text-gray-700 font-medium hover:text-blue-600 cursor-pointer"
-                          >
-                            {call.name}
-                          </span>
-                          <span className="text-xs text-gray-400 ml-2 font-normal">
-                            ({call.companyName})
-                          </span>
-
-                          {/* Hover Popover */}
-                          <div className="absolute left-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-xl opacity-0 invisible group-hover/name:opacity-100 group-hover/name:visible transition-all duration-200 z-[60] p-4 flex flex-col gap-2.5">
-                            <div className="absolute -top-1.5 left-4 w-3 h-3 bg-white border-t border-l border-gray-200 transform rotate-45"></div>
-
-                            <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-                              <User className="w-4 h-4 text-indigo-600" />
-                              <span>{call.name}</span>
-                            </div>
-
-                            <p className="text-xs text-gray-600 font-medium">{call.companyName}</p>
-
-                            <div className="text-xs text-gray-500 space-y-1 pt-1 border-t border-gray-100">
-                              <p>Phone: <span className="font-mono text-gray-800 font-medium">{call.phone}</span></p>
-                              {call.email && <p>Email: <span className="font-mono text-gray-700">{call.email}</span></p>}
-                              <p>Direction: <strong>{call.direction}</strong> • Duration: <strong>{call.duration}</strong></p>
-                              <p>Outcome: <strong>{call.outcome}</strong></p>
-                              <p>Agent: <strong>{call.assignedTo}</strong></p>
-                              {call.notes && <p className="text-gray-600 italic mt-1">"{call.notes}"</p>}
-                            </div>
-
-                            <div className="mt-1">
-                              <span className="inline-block bg-slate-50 border border-slate-200 text-slate-600 text-[11px] px-2.5 py-0.5 rounded-full font-medium">
-                                {timeAgo(call.createdAt)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Name Cell Action Cluster: Eye, Edit, Bell, MoreVertical */}
-                      <div className="flex items-center gap-1.5">
-                        {/* Eye Button -> View Details */}
-                        <button
+                          {call.name || 'Unnamed Contact'}
+                        </Link>
+                      ) : (
+                        <span
                           onClick={() => {
                             setSelectedCall(call);
                             setIsViewModalOpen(true);
                           }}
-                          className="p-1 border border-gray-200 rounded text-gray-600 hover:bg-gray-50 hover:text-blue-600 bg-white"
-                          title="View Details"
+                          className="text-gray-700 font-medium hover:text-blue-600 cursor-pointer"
                         >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-
-                        {/* Edit Button -> Edit Call */}
-                        <button
-                          onClick={() => {
-                            setSelectedCall(call);
-                            setIsEditModalOpen(true);
-                          }}
-                          className="p-1 border border-gray-200 rounded text-gray-600 hover:bg-gray-50 bg-white"
-                          title="Edit Call"
-                        >
-                          <Edit className="w-3.5 h-3.5" />
-                        </button>
-
-                        {/* Bell Button (Purple) -> Open Existing SetReminderModal */}
-                        <button
-                          onClick={() => openReminderForCall(call)}
-                          className="p-1 border border-purple-600 bg-purple-600 text-white rounded hover:bg-purple-700"
-                          title="Set Reminder"
-                        >
-                          <Bell className="w-3.5 h-3.5" />
-                        </button>
-
-                        {/* More Menu */}
-                        <div className="relative">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenMoreId(openMoreId === call.id ? null : call.id);
-                            }}
-                            className="p-1 border border-gray-200 rounded text-gray-600 hover:bg-gray-50 bg-white"
-                            title="More Actions"
-                          >
-                            <MoreVertical className="w-3.5 h-3.5" />
-                          </button>
-
-                          {openMoreId === call.id && (
-                            <div
-                              className="absolute right-full mr-2 top-1/2 -translate-y-1/2 bg-white border border-gray-200 shadow-lg rounded-md p-1.5 flex items-center gap-1.5 z-50 animate-in fade-in zoom-in duration-150"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <button
-                                onClick={() => {
-                                  setOpenMoreId(null);
-                                  setSelectedCall(call);
-                                  setIsViewModalOpen(true);
-                                }}
-                                className="p-1.5 text-gray-600 hover:bg-gray-100 rounded"
-                                title="View Details"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  setOpenMoreId(null);
-                                  setSelectedCall(call);
-                                  setIsEditModalOpen(true);
-                                }}
-                                className="p-1.5 text-gray-600 hover:bg-gray-100 rounded"
-                                title="Edit"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  setOpenMoreId(null);
-                                  openReminderForCall(call);
-                                }}
-                                className="p-1.5 text-purple-600 hover:bg-purple-50 rounded"
-                                title="Set Reminder"
-                              >
-                                <Bell className="w-4 h-4" />
-                              </button>
-
-                              {call.phone && (
-                                <a
-                                  href={`https://wa.me/${call.phone.replace(/[^0-9]/g, '')}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-1.5 text-green-600 hover:bg-green-50 rounded"
-                                  title="WhatsApp"
-                                >
-                                  <WhatsAppIcon className="w-4 h-4" />
-                                </a>
-                              )}
-
-                              <button
-                                onClick={() => {
-                                  setOpenMoreId(null);
-                                  handleDelete(call.id);
-                                }}
-                                className="p-1.5 text-red-500 hover:bg-red-50 rounded"
-                                title="Delete"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                          {call.name || 'Unnamed Contact'}
+                        </span>
+                      )}
+                      {call.companyName && (
+                        <span className="text-xs text-gray-400 font-normal">
+                          ({call.companyName})
+                        </span>
+                      )}
                     </div>
                   </td>
 
-                  {/* Direction Badge */}
+                  {/* Phone Column */}
+                  <td className="px-3 py-3">
+                    {call.phone ? (
+                      <div className="inline-flex items-center gap-1.5 font-mono text-xs text-gray-800 bg-gray-50 px-2.5 py-1 rounded">
+                        <span>{call.phone}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => handleCopyPhone(call.phone, e)}
+                          className="text-gray-400 hover:text-gray-700 transition-colors"
+                          title="Copy Phone Number"
+                        >
+                          {copiedPhone === call.phone ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-gray-300 text-xs italic">-</span>
+                    )}
+                  </td>
+
+                  {/* Call Type */}
                   <td className="px-3 py-3 text-center">
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${call.direction === 'Inbound'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : 'bg-blue-50 text-blue-700 border-blue-200'
-                      }`}>
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+                      call.direction === 'Inbound'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : call.direction === 'Missed'
+                        ? 'bg-rose-50 text-rose-700'
+                        : 'bg-blue-50 text-blue-700'
+                    }`}>
                       {call.direction === 'Inbound' ? (
                         <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-600" />
+                      ) : call.direction === 'Missed' ? (
+                        <PhoneMissed className="w-3.5 h-3.5 text-rose-600" />
                       ) : (
                         <ArrowUpRight className="w-3.5 h-3.5 text-blue-600" />
                       )}
@@ -760,36 +585,12 @@ export function CallsPage() {
                     </span>
                   </td>
 
-                  {/* Call Status Dropdown Select */}
+                  {/* Call Result Dropdown Select - 1:1 Matching LeadsPage */}
                   <td className="px-3 py-3 text-center">
                     <select
-                      value={call.callStatus || 'Untouched'}
-                      onChange={(e) => updateCallStatus(call.id, e.target.value)}
-                      className={`h-8 px-2 border rounded text-xs font-medium outline-none cursor-pointer bg-white transition-colors
-                        ${call.callStatus === 'Connected' ? 'border-green-500 text-green-700 bg-green-50/50' :
-                          call.callStatus === 'Callback Scheduled' ? 'border-purple-500 text-purple-700 bg-purple-50/50' :
-                            call.callStatus === 'Busy' ? 'border-amber-500 text-amber-700 bg-amber-50/50' :
-                              call.callStatus === 'No Answer' || call.callStatus === 'Not Answered' ? 'border-red-500 text-red-700 bg-red-50/50' :
-                                'border-gray-300 text-gray-700'}
-                      `}
-                    >
-                      {CALL_STATUSES.map(status => (
-                        <option key={status} value={status}>{status}</option>
-                      ))}
-                    </select>
-                  </td>
-
-                  {/* Outcome Dropdown Select */}
-                  <td className="px-3 py-3 text-center">
-                    <select
-                      value={call.outcome || 'Follow-up Required'}
+                      value={call.outcome || '-None-'}
                       onChange={(e) => updateCallOutcome(call.id, e.target.value)}
-                      className={`h-8 px-2 border rounded text-xs font-medium outline-none cursor-pointer bg-white transition-colors
-                        ${call.outcome === 'Interested' || call.outcome === 'Closed Won' ? 'border-emerald-500 text-emerald-700 bg-emerald-50/50' :
-                          call.outcome === 'Follow-up Required' ? 'border-indigo-500 text-indigo-700 bg-indigo-50/50' :
-                            call.outcome === 'Not Interested' ? 'border-rose-500 text-rose-700 bg-rose-50/50' :
-                              'border-gray-300 text-gray-700'}
-                      `}
+                      className="h-8 px-2 border border-gray-300 rounded text-sm outline-none cursor-pointer bg-white text-gray-700"
                     >
                       {CALL_OUTCOMES.map(outcome => (
                         <option key={outcome} value={outcome}>{outcome}</option>
@@ -797,30 +598,65 @@ export function CallsPage() {
                     </select>
                   </td>
 
-                  {/* Duration Column */}
+                  {/* Duration */}
                   <td className="px-3 py-3 text-center">
-                    <span className="font-mono text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-200">
+                    <span className="font-mono text-xs text-gray-700 bg-gray-50 px-2.5 py-1 rounded">
                       {call.duration || '00:00'}
                     </span>
                   </td>
 
-                  {/* Date Column */}
-                  <td className="px-4 py-3 text-gray-500 text-center text-xs">
-                    {formatDate(call.dateTime || call.createdAt)}
+                  {/* Date & Time */}
+                  <td className="px-4 py-3 text-center">
+                    <div className="text-xs text-gray-700 font-medium">
+                      {formatDate(call.dateTime || call.createdAt)}
+                    </div>
+                    <div className="text-[11px] text-gray-400">
+                      {timeAgo(call.dateTime || call.createdAt)}
+                    </div>
                   </td>
 
-                  {/* Quick Action Column - Exact Segmented Box from LeadsPage */}
+                  {/* Recording */}
+                  <td className="px-3 py-3 text-center">
+                    {call.recordingUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCall(call);
+                          setIsViewModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-xs font-medium cursor-pointer transition-colors"
+                        title="Listen to call recording"
+                      >
+                        <Volume2 className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Audio</span>
+                      </button>
+                    ) : (
+                      <span className="text-gray-300 text-xs">-</span>
+                    )}
+                  </td>
+
+                  {/* Quick Action - Exact Segmented Box from LeadsPage */}
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center">
                       <div className="flex items-center border border-gray-200 rounded divide-x divide-gray-200 bg-white">
                         {call.phone ? (
-                          <a
-                            href={`tel:${call.phone}`}
-                            className="p-1.5 hover:bg-gray-50 text-blue-600 rounded-none border-0 block"
-                            title={`Call ${call.phone}`}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              startCall({
+                                id: call.id,
+                                name: call.name,
+                                phone: call.phone,
+                                companyName: call.companyName,
+                                email: call.email,
+                                sourceType: 'call'
+                              });
+                            }}
+                            className="p-1.5 hover:bg-gray-50 text-blue-600 rounded-none border-0 block cursor-pointer"
+                            title={`Call via In-App Dialer: ${call.phone}`}
                           >
                             <Phone className="w-4 h-4" />
-                          </a>
+                          </button>
                         ) : (
                           <button className="p-1.5 text-gray-300 cursor-not-allowed" disabled title="No Phone">
                             <Phone className="w-4 h-4" />
@@ -835,7 +671,7 @@ export function CallsPage() {
                             className="p-1.5 hover:bg-gray-50 text-green-600 rounded-none border-0 block"
                             title="WhatsApp"
                           >
-                            <WhatsAppIcon className="w-4 h-4" />
+                            <WhatsAppIcon className="w-4 h-4 text-green-500" />
                           </a>
                         ) : (
                           <button className="p-1.5 text-gray-300 cursor-not-allowed" disabled title="No Phone">
@@ -843,21 +679,41 @@ export function CallsPage() {
                           </button>
                         )}
 
-                        {call.email ? (
-                          <a
-                            href={`mailto:${call.email}`}
-                            className="p-1.5 hover:bg-gray-50 text-teal-600 rounded-none border-0 block"
-                            title="Send Email"
-                          >
-                            <Mail className="w-4 h-4" />
-                          </a>
-                        ) : (
-                          <button className="p-1.5 text-gray-300 cursor-not-allowed" disabled title="No Email">
-                            <Mail className="w-4 h-4" />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => openReminderForCall(call)}
+                          className="p-1.5 hover:bg-purple-50 text-purple-600 rounded-none border-0 block"
+                          title="Set Reminder"
+                        >
+                          <Bell className="w-4 h-4" />
+                        </button>
 
                         <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedCall(call);
+                            setIsViewModalOpen(true);
+                          }}
+                          className="p-1.5 hover:bg-gray-50 text-gray-600 rounded-none border-0 block"
+                          title="View Details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedCall(call);
+                            setIsEditModalOpen(true);
+                          }}
+                          className="p-1.5 hover:bg-gray-50 text-gray-600 rounded-none border-0 block"
+                          title="Edit Call Log"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+
+                        <button
+                          type="button"
                           onClick={() => handleDelete(call.id)}
                           className="p-1.5 hover:bg-gray-50 text-red-500 rounded-none border-0 block"
                           title="Delete"
@@ -870,9 +726,9 @@ export function CallsPage() {
                 </tr>
               ))}
 
-              {paginatedCalls.length === 0 && !loading && (
+              {calls.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                     No calls found. Click "+ Add Call" to log one.
                   </td>
                 </tr>
@@ -881,37 +737,36 @@ export function CallsPage() {
           </table>
         </div>
 
-        {/* Pagination Controls - 1:1 Matching LeadsPage */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100 rounded-b-md">
-            <div className="text-xs text-gray-500">
-              Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, filteredCalls.length)} of {filteredCalls.length} calls
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="h-8 px-2"
-              >
-                <ChevronLeft className="w-4 h-4 mr-1" /> Previous
-              </Button>
-              <span className="text-xs font-medium text-gray-700">
-                Page {currentPage} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="h-8 px-2"
-              >
-                Next <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </div>
+        {/* Pagination Toolbar - 1:1 Matching LeadsPage */}
+        <div className="p-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500 bg-white">
+          <div>
+            Showing {totalCalls === 0 ? 0 : (currentPage - 1) * pageSize + 1} to{' '}
+            {Math.min(currentPage * pageSize, totalCalls)} of {totalCalls} entries
           </div>
-        )}
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="h-8 px-2 text-xs"
+            >
+              <ChevronLeft className="w-3.5 h-3.5 mr-1" /> Prev
+            </Button>
+            <span className="px-2 text-xs font-medium text-gray-700">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages || totalCalls === 0}
+              className="h-8 px-2 text-xs"
+            >
+              Next <ChevronRight className="w-3.5 h-3.5 ml-1" />
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* View Call Details Modal Component */}
@@ -930,25 +785,14 @@ export function CallsPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={async (newCall) => {
-          setCalls(prev => [newCall, ...prev]);
           try {
             const token = localStorage.getItem('token');
             if (token) {
-              await api.post('/activities', {
-                type: 'CALL',
-                title: `Call logged: ${newCall.callStatus}`,
-                description: newCall.notes,
-                metadata: {
-                  name: newCall.name,
-                  companyName: newCall.companyName,
-                  phone: newCall.phone,
-                  duration: newCall.duration,
-                  direction: newCall.direction
-                }
-              }, { headers: { Authorization: `Bearer ${token}` } });
+              await api.post('/calls', newCall, { headers: { Authorization: `Bearer ${token}` } });
+              fetchCallsData();
             }
           } catch (e) {
-            console.error('Failed to log call activity', e);
+            console.error('Failed to log call', e);
           }
         }}
         availableMembers={availableMembers}
@@ -962,8 +806,16 @@ export function CallsPage() {
           setSelectedCall(null);
         }}
         call={selectedCall}
-        onSave={(updatedCall) => {
-          setCalls(calls.map(c => c.id === updatedCall.id ? updatedCall : c));
+        onSave={async (updatedCall) => {
+          try {
+            const token = localStorage.getItem('token');
+            if (token) {
+              await api.put(`/calls/${updatedCall.id}`, updatedCall, { headers: { Authorization: `Bearer ${token}` } });
+              fetchCallsData();
+            }
+          } catch (e) {
+            console.error('Failed to update call', e);
+          }
         }}
         availableMembers={availableMembers}
       />
@@ -983,3 +835,5 @@ export function CallsPage() {
     </div>
   );
 }
+
+export default CallsPage;

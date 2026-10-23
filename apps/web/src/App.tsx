@@ -9,13 +9,16 @@ import { ContactsPage } from './modules/contacts/pages/ContactsPage';
 import { CreateContactPage } from './modules/contacts/pages/CreateContactPage';
 import { SettingsPage } from './modules/settings/pages/SettingsPage';
 import { CompanyProfilePage } from './modules/settings/pages/CompanyProfilePage';
+import { TeamManagementPage } from './modules/settings/pages/TeamManagementPage';
+import { CreateTeamMemberPage } from './modules/settings/pages/CreateTeamMemberPage';
+import { TeamRolesPage } from './modules/settings/pages/TeamRolesPage';
+import { RolePermissionsPage } from './modules/settings/pages/RolePermissionsPage';
 import { DealsListPage } from './modules/deals/pages/DealsListPage';
 import { TasksPage } from './modules/tasks/pages/TasksPage';
 import { MeetingsPage } from './modules/meetings/pages/MeetingsPage';
 import { CallsPage } from './modules/calls/pages/CallsPage';
 import { ReportsPage } from './modules/reports/pages/ReportsPage';
 import { WhatsAppPage } from './modules/whatsapp/pages/WhatsAppPage';
-import { AutomationPage } from './modules/automation/pages/AutomationPage';
 import { LeadsPage } from './modules/leads/pages/LeadsPage';
 import { ClientDetailsPage } from './modules/leads/pages/ClientDetailsPage';
 import { LeadsPipelinePage } from './modules/leads/pages/LeadsPipelinePage';
@@ -47,6 +50,7 @@ import { ConfigureTradeIndiaPage } from './modules/integrations/pages/ConfigureT
 import { ConfigureGenericWebhookPage } from './modules/integrations/pages/ConfigureGenericWebhookPage';
 import { ConfigureGoogleSheetsPage } from './modules/integrations/pages/ConfigureGoogleSheetsPage';
 import { ConfigureImportCSVPage } from './modules/integrations/pages/ConfigureImportCSVPage';
+import { ConfigureTelephonyPage } from './modules/integrations/pages/ConfigureTelephonyPage';
 import { ProductsPage } from './modules/products/pages/ProductsPage';
 import { CreateProductPage } from './modules/products/pages/CreateProductPage';
 import { ViewProductPage } from './modules/products/pages/ViewProductPage';
@@ -65,7 +69,6 @@ import { TicketsPage } from './modules/tickets/pages/TicketsPage';
 import { CasesPage } from './modules/cases/pages/CasesPage';
 import { SolutionsPage } from './modules/solutions/pages/SolutionsPage';
 import { WorkflowsPage } from './modules/workflows/pages/WorkflowsPage';
-import { BillingPage } from './modules/billing/pages/BillingPage';
 import { SuperAdminPage } from './modules/admin/pages/SuperAdminPage';
 import { SuperAdminLoginPage } from './modules/admin/pages/SuperAdminLoginPage';
 import { TenantsPage } from './modules/admin/pages/TenantsPage';
@@ -78,14 +81,16 @@ import { FeatureFlagsPage } from './modules/admin/pages/FeatureFlagsPage';
 import { AnnouncementsPage } from './modules/admin/pages/AnnouncementsPage';
 import { SystemSettingsPage } from './modules/admin/pages/SystemSettingsPage';
 import { AuditLogsPage } from './modules/admin/pages/AuditLogsPage';
-import { PermissionsPage } from './modules/permissions/pages/PermissionsPage';
 import { PipelinePage } from './modules/pipeline/pages/PipelinePage';
+import { ManagementPage } from './modules/management/pages/ManagementPage';
+import { CategoriesPage } from './modules/categories/pages/CategoriesPage';
 import { AdminLayout } from './components/layout/AdminLayout';
 
 function App() {
   return (
     <Routes>
       {/* Public Auth Routes */}
+      <Route path="/login" element={<LoginPage />} />
       <Route path="/auth/login" element={<LoginPage />} />
       <Route path="/auth/register" element={<RegisterPage />} />
       <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
@@ -95,24 +100,38 @@ function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/management" element={<ManagementPage />} />
+          <Route path="/management-hub" element={<ManagementPage />} />
           <Route path="/contacts" element={<ContactsPage />} />
           <Route path="/contacts/create" element={<CreateContactPage />} />
           <Route path="/contacts/edit/:id" element={<CreateContactPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/company-profile" element={<CompanyProfilePage />} />
+          <Route path="/team" element={<TeamManagementPage />} />
+          <Route path="/team-management" element={<TeamManagementPage />} />
+          <Route path="/team/create" element={<CreateTeamMemberPage />} />
+          <Route path="/team/new" element={<CreateTeamMemberPage />} />
+          <Route path="/team/edit/:id" element={<CreateTeamMemberPage />} />
+          <Route path="/team/roles" element={<TeamRolesPage />} />
+          <Route path="/team/roles/create" element={<RolePermissionsPage />} />
+          <Route path="/team/roles/new" element={<RolePermissionsPage />} />
+          <Route path="/team/roles/edit/:id" element={<RolePermissionsPage />} />
           <Route path="/lead-manager" element={<LeadsPage />} />
           <Route path="/clients/:id" element={<ClientDetailsPage />} />
           <Route path="/groups" element={<GroupsPage />} />
           <Route path="/funnels" element={<FunnelsPage />} />
           <Route path="/leads-pipelines" element={<LeadsPipelinePage />} />
           <Route path="/leads/pipeline-board/:id" element={<LeadsPipelineBoardPage />} />
+          <Route path="/deals" element={<DealsListPage />} />
+          <Route path="/deals-manager" element={<DealsListPage />} />
+          <Route path="/deal-manager" element={<DealsListPage />} />
           <Route path="/deals-pipelines" element={<DealsPipelinePage />} />
           <Route path="/deals/pipeline-board/:id" element={<DealsPipelineBoardPage />} />
           <Route path="/tasks" element={<TasksPage />} />
           <Route path="/meetings" element={<MeetingsPage />} />
           <Route path="/calls" element={<CallsPage />} />
           <Route path="/whatsapp" element={<WhatsAppPage />} />
-          <Route path="/automation" element={<AutomationPage />} />
+          <Route path="/automation" element={<Navigate to="/workflows" replace />} />
           <Route path="/ai" element={<AIPage />} />
           <Route path="/quotations" element={<QuotationsPage />} />
           <Route path="/quotations/create" element={<CreateQuotationPage />} />
@@ -140,6 +159,9 @@ function App() {
           <Route path="/configure-webhooks" element={<ConfigureGenericWebhookPage />} />
           <Route path="/configure-google-sheets" element={<ConfigureGoogleSheetsPage />} />
           <Route path="/import-csv" element={<ConfigureImportCSVPage />} />
+          <Route path="/configure-telephony" element={<ConfigureTelephonyPage />} />
+          <Route path="/categories" element={<CategoriesPage />} />
+          <Route path="/products/categories" element={<CategoriesPage />} />
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/products/create" element={<CreateProductPage />} />
           <Route path="/products/edit/:id" element={<CreateProductPage />} />
@@ -169,14 +191,6 @@ function App() {
           <Route path="/solutions" element={<SolutionsPage />} />
           <Route path="/workflows" element={<WorkflowsPage />} />
           <Route path="/pipeline" element={<PipelinePage />} />
-        </Route>
-      </Route>
-
-      {/* Protected: Company Admin + Super Admin only */}
-      <Route element={<ProtectedRoute allowedRoles={['superadmin', 'companyadmin']} />}>
-        <Route element={<DashboardLayout />}>
-          <Route path="/billing" element={<BillingPage />} />
-          <Route path="/permissions" element={<PermissionsPage />} />
         </Route>
       </Route>
 

@@ -44,8 +44,9 @@ export const getCompanyUsers = async (req: AuthRequest, res: Response) => {
         id: true,
         name: true,
         email: true,
+        phone: true,
         role: {
-          select: { name: true }
+          select: { id: true, name: true, permissions: true }
         }
       }
     });
@@ -62,7 +63,7 @@ export const createUser = async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ message: 'Not authorized' });
     }
 
-    const { name, email, roleName, password } = req.body;
+    const { name, email, phone, roleName, password, permissions } = req.body;
     
     if (!name || !email || !roleName || !password) {
       return res.status(400).json({ message: 'Missing required fields' });
@@ -85,8 +86,13 @@ export const createUser = async (req: AuthRequest, res: Response) => {
         data: {
           name: roleName,
           companyId: req.user.companyId,
-          permissions: []
+          permissions: Array.isArray(permissions) ? permissions : []
         }
+      });
+    } else if (Array.isArray(permissions) && permissions.length > 0 && role.name.toLowerCase() !== 'admin') {
+      role = await prisma.role.update({
+        where: { id: role.id },
+        data: { permissions }
       });
     }
 
@@ -96,6 +102,7 @@ export const createUser = async (req: AuthRequest, res: Response) => {
       data: {
         name,
         email,
+        phone: phone ? phone.trim() : null,
         passwordHash: hashedPassword,
         companyId: req.user.companyId,
         roleId: role.id
@@ -104,6 +111,7 @@ export const createUser = async (req: AuthRequest, res: Response) => {
         id: true,
         name: true,
         email: true,
+        phone: true,
         role: {
           select: { name: true }
         }
@@ -200,7 +208,7 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
     }
 
     const { id } = req.params;
-    const { name, email, roleName, password } = req.body;
+    const { name, email, phone, roleName, password, permissions } = req.body;
 
     const userToUpdate = await prisma.user.findUnique({ where: { id } });
     if (!userToUpdate) {
@@ -219,13 +227,25 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
       });
       if (!role) {
         role = await prisma.role.create({
-          data: { name: roleName, companyId: req.user.companyId, permissions: [] }
+          data: {
+            name: roleName,
+            companyId: req.user.companyId,
+            permissions: Array.isArray(permissions) ? permissions : []
+          }
+        });
+      } else if (Array.isArray(permissions) && role.name.toLowerCase() !== 'admin') {
+        role = await prisma.role.update({
+          where: { id: role.id },
+          data: { permissions }
         });
       }
       roleId = role.id;
     }
 
     const updateData: any = { name, email, roleId };
+    if (phone !== undefined) {
+      updateData.phone = phone ? phone.trim() : null;
+    }
     
     if (password) {
       updateData.passwordHash = await hashPassword(password);
@@ -238,6 +258,7 @@ export const updateUser = async (req: AuthRequest, res: Response) => {
         id: true,
         name: true,
         email: true,
+        phone: true,
         role: { select: { name: true } }
       }
     });

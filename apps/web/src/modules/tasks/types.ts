@@ -11,6 +11,7 @@ export interface TaskItem {
   assignedTo: string;
   description: string;
   phone?: string;
+  leadId?: string;
   createdAt: string;
   nextFollowUp?: string;
 }

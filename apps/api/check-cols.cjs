@@ -1,1 +1,0 @@
-// Scratch inspection completed successfully.

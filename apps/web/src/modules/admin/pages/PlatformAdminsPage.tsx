@@ -29,39 +29,6 @@ export interface PlatformAdmin {
   lastActive?: string;
 }
 
-const FALLBACK_ADMINS: PlatformAdmin[] = [
-  {
-    id: 'admin-1',
-    name: 'Platform Super Admin',
-    email: 'admin@platform.com',
-    phone: '+1 (555) 019-2834',
-    role: 'superadmin',
-    status: 'Active',
-    company: 'Platform Administration',
-    lastActive: new Date().toISOString()
-  },
-  {
-    id: 'admin-2',
-    name: 'Security & DevOps Lead',
-    email: 'devops@platform.com',
-    phone: '+1 (555) 019-8821',
-    role: 'admin',
-    status: 'Active',
-    company: 'Platform Administration',
-    lastActive: new Date(Date.now() - 3600000 * 4).toISOString()
-  },
-  {
-    id: 'admin-3',
-    name: 'Platform Support Ops',
-    email: 'support-lead@platform.com',
-    phone: '+1 (555) 019-4491',
-    role: 'support',
-    status: 'Active',
-    company: 'Platform Administration',
-    lastActive: new Date(Date.now() - 3600000 * 24).toISOString()
-  }
-];
-
 export function PlatformAdminsPage() {
   const [admins, setAdmins] = useState<PlatformAdmin[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,14 +52,13 @@ export function PlatformAdminsPage() {
     try {
       setLoading(true);
       const res = await api.get('/admin/platform-admins');
-      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+      if (res.data && Array.isArray(res.data)) {
         setAdmins(res.data);
       } else {
-        setAdmins(FALLBACK_ADMINS);
+        setAdmins([]);
       }
     } catch {
-      // In case of error (e.g. mock environment without backend), fallback gracefully
-      setAdmins(FALLBACK_ADMINS);
+      setAdmins([]);
     } finally {
       setLoading(false);
     }

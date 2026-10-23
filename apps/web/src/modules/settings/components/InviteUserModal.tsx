@@ -5,17 +5,19 @@ import { Input } from '@/components/ui/input';
 
 interface InviteUserModalProps {
   isOpen: boolean;
+  roles?: { id: string; name: string }[];
   onClose: () => void;
   onSubmit: (data: any) => Promise<void>;
 }
 
-export function InviteUserModal({ isOpen, onClose, onSubmit }: InviteUserModalProps) {
+export function InviteUserModal({ isOpen, roles = [], onClose, onSubmit }: InviteUserModalProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     password: '',
-    roleName: 'Sales Rep'
+    roleName: roles.length > 0 ? roles[0].name : 'Sales Rep'
   });
 
   if (!isOpen) return null;
@@ -25,7 +27,7 @@ export function InviteUserModal({ isOpen, onClose, onSubmit }: InviteUserModalPr
     setLoading(true);
     try {
       await onSubmit(formData);
-      setFormData({ name: '', email: '', password: '', roleName: 'Sales Rep' });
+      setFormData({ name: '', email: '', phone: '', password: '', roleName: 'Sales Rep' });
       onClose();
     } catch (err) {
       console.error(err);
@@ -70,6 +72,20 @@ export function InviteUserModal({ isOpen, onClose, onSubmit }: InviteUserModalPr
                 placeholder="rahul@company.com"
               />
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Calling Number / Extension (Tata Trunk / Mobile)
+              </label>
+              <Input
+                value={formData.phone}
+                onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="e.g. 101, 102, or 9876543210"
+              />
+              <p className="text-[11px] text-gray-500 mt-1">
+                Tata calls will ring this agent on their assigned extension/phone.
+              </p>
+            </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -92,11 +108,22 @@ export function InviteUserModal({ isOpen, onClose, onSubmit }: InviteUserModalPr
               <select 
                 value={formData.roleName}
                 onChange={e => setFormData({ ...formData, roleName: e.target.value })}
-                className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium"
               >
-                <option value="Admin">Admin</option>
-                <option value="Manager">Manager</option>
-                <option value="Sales Rep">Sales Rep</option>
+                {roles.length > 0 ? (
+                  roles.map((r) => (
+                    <option key={r.id || r.name} value={r.name}>
+                      {r.name}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="Admin">Admin</option>
+                    <option value="Sales Manager">Sales Manager</option>
+                    <option value="Sales Rep">Sales Rep</option>
+                    <option value="Telecaller / Agent">Telecaller / Agent</option>
+                  </>
+                )}
               </select>
             </div>
           </div>

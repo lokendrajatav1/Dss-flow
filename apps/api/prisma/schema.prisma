@@ -55,6 +55,7 @@ model Company {
   SalesOrder     SalesOrder[]
   PurchaseOrder  PurchaseOrder[]
   Vendor         Vendor[]
+  ProductCategory ProductCategory[]
 }
 
 // ------------------------------------------------------
@@ -101,6 +102,7 @@ model User {
   tasksAssigned       Task[]     @relation("TaskAssignedTo")
   tasksCreated        Task[]     @relation("TaskCreatedBy")
   filesUploaded       File[]
+  conversations       Conversation[]
 }
 
 model Role {
@@ -192,6 +194,8 @@ model Lead {
   tasks      Task[]
   files      File[]
   emails     EmailMessage[]
+  contacts   Contact[]
+  conversations Conversation[]
 
   @@index([companyId, phone])
   @@index([companyId, email])
@@ -412,12 +416,17 @@ model Deal {
   customerId String?
   stageId           String
   value             Float     @default(0)
+  startDate         DateTime?
   expectedCloseDate DateTime?
   priority          String    @default("Medium") // High, Medium, Low
   assignedToId      String?
+  callStatus        String?
+  funnelId          String?
+  groupId           String?
+  attachmentUrl     String?
   notes             String?
   createdAt         DateTime  @default(now())
-  updatedAt  DateTime @updatedAt
+  updatedAt         DateTime  @updatedAt
 
   company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   lead     Lead?         @relation(fields: [leadId], references: [id])
@@ -443,11 +452,14 @@ model Contact {
   avatar    String?
   status    String   @default("NEW") // NEW, ACTIVE, INACTIVE
   lastMessageAt DateTime @default(now())
+  leadId    String?
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead     Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
 
   @@unique([companyId, phone])
   @@index([companyId, phone])
+  @@index([leadId])
 }
 
 model Conversation {
@@ -460,8 +472,12 @@ model Conversation {
   contactName   String?
   contactAvatar String?
   lastMessageAt DateTime @default(now())
+  assignedToId  String?
+  leadId        String?
 
   company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignedTo User?   @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  lead     Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
   messages Message[]
 }
 
@@ -568,6 +584,20 @@ model Product {
   updatedAt   DateTime @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model ProductCategory {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, name])
+  @@index([companyId])
 }
 
 model Quotation {

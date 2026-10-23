@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Filter, FileText, RefreshCw, Trash2, Search, MoreVertical,
   Star, Eye, Edit, Bell, Phone, Video,
-  ChevronLeft, ChevronRight, User
+  ChevronLeft, ChevronRight, User, ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
@@ -32,21 +33,8 @@ const timeAgo = (dateStr: string) => {
   return `${Math.floor(diff / 86400)} days ago`;
 };
 
-const INITIAL_MEETINGS: Meeting[] = [];
-
 export function MeetingsPage() {
-  const [meetings, setMeetings] = useState<Meeting[]>(() => {
-    const saved = localStorage.getItem('crm_meetings_data');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Exclude legacy mock meeting records
-        const filtered = Array.isArray(parsed) ? parsed.filter(m => !['m-1', 'm-2', 'm-3', 'm-4'].includes(m.id)) : [];
-        return filtered;
-      } catch (e) { /* ignore */ }
-    }
-    return INITIAL_MEETINGS;
-  });
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
 
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -70,9 +58,6 @@ export function MeetingsPage() {
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [selectedLead, setSelectedLead] = useState<any>(null);
 
-  useEffect(() => {
-    localStorage.setItem('crm_meetings_data', JSON.stringify(meetings));
-  }, [meetings]);
 
   useEffect(() => {
     const handleClickOutside = () => {
@@ -106,87 +91,11 @@ export function MeetingsPage() {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const [leadsRes, activitiesRes] = await Promise.allSettled([
-        api.get('/leads', { headers: { Authorization: `Bearer ${token}` } }),
-        api.get('/activities', { headers: { Authorization: `Bearer ${token}` } })
-      ]);
-
-      const leads = leadsRes.status === 'fulfilled' && Array.isArray(leadsRes.value.data) ? leadsRes.value.data : [];
-      const activities = activitiesRes.status === 'fulfilled' && Array.isArray(activitiesRes.value.data) ? activitiesRes.value.data : [];
-
-      const fetchedMeetings: Meeting[] = [];
-
-      // 1. Process Activities of type 'MEETING'
-      activities
-        .filter((act: any) => act.type === 'MEETING')
-        .forEach((act: any) => {
-          const lead = act.lead || {};
-          const dtString = act.metadata?.activityDate ? act.metadata.activityDate.slice(0, 16) : act.createdAt?.slice(0, 16);
-          const datePart = dtString ? dtString.split('T')[0] : '';
-          const timePart = dtString ? dtString.split('T')[1] : '11:00';
-
-          fetchedMeetings.push({
-            id: `act-meeting-${act.id}`,
-            title: act.title || `Meeting: ${lead.name || 'Client'}`,
-            clientName: lead.name || act.metadata?.name || 'Prospect Contact',
-            clientCompany: lead.companyName || act.metadata?.companyName || 'Lead Organization',
-            clientEmail: lead.email || '',
-            clientPhone: lead.phone || lead.whatsappNumber || '',
-            date: datePart,
-            time: timePart,
-            dateTime: dtString,
-            duration: act.metadata?.duration || '30 mins',
-            type: act.metadata?.type || 'Google Meet',
-            meetingLink: act.metadata?.meetingLink || 'https://meet.google.com/new',
-            host: act.performedBy?.name || 'Unassigned',
-            status: 'Scheduled',
-            priority: 'Normal',
-            agenda: act.description || 'Scheduled client meeting.',
-            createdAt: act.createdAt || new Date().toISOString()
-          });
-        });
-
-      // 2. Process Leads with scheduled follow-ups
-      leads
-        .filter((l: any) => l.nextFollowUp != null)
-        .forEach((l: any) => {
-          const dtString = l.nextFollowUp ? l.nextFollowUp.slice(0, 16) : undefined;
-          const datePart = dtString ? dtString.split('T')[0] : '';
-          const timePart = dtString ? dtString.split('T')[1] : '11:00';
-
-          const alreadyAdded = fetchedMeetings.some(m => m.clientPhone && m.clientPhone === l.phone);
-          if (!alreadyAdded) {
-            fetchedMeetings.push({
-              id: `lead-meeting-${l.id}`,
-              title: `Meeting: ${l.name || 'Lead Discovery'}`,
-              clientName: l.name || 'Prospect Contact',
-              clientCompany: l.companyName || 'Lead Organization',
-              clientEmail: l.email || '',
-              clientPhone: l.phone || l.whatsappNumber || '',
-              date: datePart,
-              time: timePart,
-              dateTime: dtString,
-              duration: '30 mins',
-              type: 'Google Meet',
-              meetingLink: 'https://meet.google.com/new',
-              host: l.assignedTo?.name || 'Unassigned',
-              status: 'Scheduled',
-              priority: l.priority || 'Normal',
-              agenda: l.notes || l.feedback || 'Scheduled follow-up meeting.',
-              createdAt: l.updatedAt || new Date().toISOString()
-            });
-          }
-        });
-
-      if (fetchedMeetings.length > 0) {
-        setMeetings(prev => {
-          const fetchedIds = new Set(fetchedMeetings.map(m => m.id));
-          const localOnly = prev.filter(m => !fetchedIds.has(m.id) && !m.id.startsWith('lead-meeting-') && !m.id.startsWith('act-meeting-'));
-          return [...fetchedMeetings, ...localOnly];
-        });
-      }
+      const res = await api.get('/meetings', { headers: { Authorization: `Bearer ${token}` } });
+      const fetchedMeetings = Array.isArray(res.data) ? res.data : [];
+      setMeetings(fetchedMeetings);
     } catch (err) {
-      // Graceful fallback
+      console.error('Failed to fetch meetings', err);
     } finally {
       setLoading(false);
     }
@@ -210,51 +119,87 @@ export function MeetingsPage() {
     }
   };
 
-  const togglePriority = (meeting: Meeting) => {
+  const togglePriority = async (meeting: Meeting) => {
     const nextPriority = meeting.priority === 'High' ? 'Normal' : 'High';
-    setMeetings(meetings.map(m => m.id === meeting.id ? { ...m, priority: nextPriority } : m));
+    setMeetings(prev => prev.map(m => m.id === meeting.id ? { ...m, priority: nextPriority } : m));
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        await api.put(`/meetings/${meeting.id}`, { priority: nextPriority }, { headers: { Authorization: `Bearer ${token}` } });
+      }
+    } catch (err) {
+      console.error('Failed to update priority', err);
+    }
   };
 
-  const updateStatus = (id: string, newStatus: string) => {
-    setMeetings(meetings.map(m => m.id === id ? { ...m, status: newStatus } : m));
-    MySwal.fire({ title: 'Updated!', text: `Meeting status set to ${newStatus}`, icon: 'success', timer: 1000, showConfirmButton: false });
+  const updateStatus = async (id: string, newStatus: string) => {
+    setMeetings(prev => prev.map(m => m.id === id ? { ...m, status: newStatus } : m));
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        await api.put(`/meetings/${id}`, { status: newStatus }, { headers: { Authorization: `Bearer ${token}` } });
+      }
+      MySwal.fire({ title: 'Updated!', text: `Meeting status set to ${newStatus}`, icon: 'success', timer: 1000, showConfirmButton: false });
+    } catch (err) {
+      console.error('Failed to update status', err);
+      fetchMeetingsData();
+    }
   };
 
-  const handleDelete = (id: string) => {
-    MySwal.fire({
+  const handleDelete = async (id: string) => {
+    const result = await MySwal.fire({
       title: 'Delete Meeting?',
-      text: 'Are you sure you want to delete this meeting record?',
+      text: 'Are you sure you want to delete this meeting from the database?',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
       cancelButtonColor: '#9ca3af',
       confirmButtonText: 'Yes, delete'
-    }).then(result => {
-      if (result.isConfirmed) {
-        setMeetings(meetings.filter(m => m.id !== id));
-        setSelectedMeetingIds(selectedMeetingIds.filter(item => item !== id));
-        MySwal.fire({ title: 'Deleted!', text: 'Meeting deleted successfully', icon: 'success', timer: 1200, showConfirmButton: false });
-      }
     });
+
+    if (result.isConfirmed) {
+      setMeetings(prev => prev.filter(m => m.id !== id));
+      setSelectedMeetingIds(prev => prev.filter(item => item !== id));
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          await api.delete(`/meetings/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+        }
+        MySwal.fire({ title: 'Deleted!', text: 'Meeting deleted successfully', icon: 'success', timer: 1200, showConfirmButton: false });
+      } catch (err) {
+        console.error('Failed to delete meeting', err);
+        fetchMeetingsData();
+      }
+    }
   };
 
-  const handleBulkDelete = () => {
+  const handleBulkDelete = async () => {
     if (selectedMeetingIds.length === 0) return;
-    MySwal.fire({
+    const result = await MySwal.fire({
       title: `Delete ${selectedMeetingIds.length} Meetings?`,
-      text: 'Are you sure you want to delete all selected records?',
+      text: 'Are you sure you want to delete all selected records from the database?',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
       cancelButtonColor: '#9ca3af',
       confirmButtonText: 'Yes, delete all'
-    }).then(result => {
-      if (result.isConfirmed) {
-        setMeetings(meetings.filter(m => !selectedMeetingIds.includes(m.id)));
-        setSelectedMeetingIds([]);
-        MySwal.fire({ title: 'Deleted!', text: 'Selected meeting records deleted.', icon: 'success', timer: 1200, showConfirmButton: false });
-      }
     });
+
+    if (result.isConfirmed) {
+      const idsToDelete = [...selectedMeetingIds];
+      setMeetings(prev => prev.filter(m => !idsToDelete.includes(m.id)));
+      setSelectedMeetingIds([]);
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          await api.post('/meetings/bulk-delete', { ids: idsToDelete }, { headers: { Authorization: `Bearer ${token}` } });
+        }
+        MySwal.fire({ title: 'Deleted!', text: 'Selected meeting records deleted.', icon: 'success', timer: 1200, showConfirmButton: false });
+      } catch (err) {
+        console.error('Failed to bulk delete meetings', err);
+        fetchMeetingsData();
+      }
+    }
   };
 
   const handleExportCSV = () => {
@@ -340,7 +285,7 @@ export function MeetingsPage() {
   return (
     <div className="space-y-4">
       {/* Top Bar - 1:1 Matching LeadsPage Top Bar */}
-      <div className="bg-white p-3 rounded-md shadow-sm border border-gray-100 flex flex-wrap items-center justify-between gap-4 relative">
+      <div className="bg-white p-3 rounded-md border border-gray-100 flex flex-wrap items-center justify-between gap-4 relative">
         <h2 className="text-[15px] font-semibold text-gray-900">
           Available Meetings : {filteredMeetings.length}
         </h2>
@@ -423,7 +368,7 @@ export function MeetingsPage() {
 
       {/* Filter Dropdown Row */}
       {showFilterDropdown && (
-        <div className="bg-white p-3 rounded-md shadow-sm border border-gray-100 flex flex-wrap items-center gap-3 animate-in fade-in duration-150">
+        <div className="bg-white p-3 rounded-md border border-gray-100 flex flex-wrap items-center gap-3 animate-in fade-in duration-150">
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-gray-500">Status:</span>
             <select
@@ -478,8 +423,8 @@ export function MeetingsPage() {
       )}
 
       {/* Table - 1:1 Matching LeadsPage Table Structure */}
-      <div className="bg-white rounded-md shadow-sm border border-gray-100 overflow-visible">
-        <div className="overflow-x-auto overflow-y-visible min-h-[400px]">
+      <div className="bg-white rounded-md border border-gray-100 overflow-visible">
+        <div className="overflow-x-auto overflow-y-hidden">
           <table className="w-full text-sm text-left whitespace-nowrap">
             <thead className="text-[11px] font-bold text-gray-700 uppercase bg-gray-50 border-b border-gray-100 tracking-wider">
               <tr>
@@ -501,7 +446,7 @@ export function MeetingsPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {paginatedMeetings.map((meeting) => (
-                <tr key={meeting.id} className="hover:bg-gray-50/50 group relative">
+                <tr key={meeting.id} className="hover:bg-gray-50/50 group relative group/row">
                   {/* Name Column with Checkbox, Star, Details */}
                   <td className="px-4 py-3 border-r border-gray-100">
                     <div className="flex items-center justify-between">
@@ -523,26 +468,47 @@ export function MeetingsPage() {
                         </span>
 
                         <div className="relative group/name">
-                          <span 
-                            onClick={() => {
-                              setSelectedMeeting(meeting);
-                              setIsViewModalOpen(true);
-                            }}
-                            className="font-medium text-gray-700 hover:text-blue-600 cursor-pointer"
-                          >
-                            {meeting.clientName}
-                          </span>
+                          {meeting.leadId ? (
+                            <Link
+                              to={`/clients/${meeting.leadId}`}
+                              className="font-medium text-gray-900 hover:text-blue-600 hover:underline cursor-pointer"
+                              title="Open 360° Client Profile"
+                            >
+                              {meeting.clientName}
+                            </Link>
+                          ) : (
+                            <span 
+                              onClick={() => {
+                                setSelectedMeeting(meeting);
+                                setIsViewModalOpen(true);
+                              }}
+                              className="font-medium text-gray-700 hover:text-blue-600 cursor-pointer"
+                            >
+                              {meeting.clientName}
+                            </span>
+                          )}
                           <span className="text-xs text-gray-400 ml-2 font-normal">
                             ({meeting.clientCompany})
                           </span>
 
                           {/* Hover Popover */}
-                          <div className="absolute left-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-xl opacity-0 invisible group-hover/name:opacity-100 group-hover/name:visible transition-all duration-200 z-[60] p-4 flex flex-col gap-2.5">
-                            <div className="absolute -top-1.5 left-4 w-3 h-3 bg-white border-t border-l border-gray-200 transform rotate-45"></div>
+                          <div className="hidden group-hover/name:flex absolute left-0 top-full mt-2 group-last/row:top-auto group-last/row:bottom-full group-last/row:mb-2 w-72 bg-white border border-gray-200 rounded-lg z-[60] p-4 flex-col gap-2.5">
+                            <div className="absolute -top-1.5 group-last/row:top-auto group-last/row:-bottom-1.5 left-4 w-3 h-3 bg-white border-t border-l group-last/row:border-t-0 group-last/row:border-l-0 group-last/row:border-b group-last/row:border-r border-gray-200 transform rotate-45"></div>
                             
-                            <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-                              <User className="w-4 h-4 text-indigo-600" />
-                              <span>{meeting.clientName}</span>
+                            <div className="flex items-center justify-between text-sm font-semibold text-gray-800">
+                              <div className="flex items-center gap-2">
+                                <User className="w-4 h-4 text-indigo-600" />
+                                <span>{meeting.clientName}</span>
+                              </div>
+                              {meeting.leadId && (
+                                <Link
+                                  to={`/clients/${meeting.leadId}`}
+                                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-0.5"
+                                  title="View 360° Profile"
+                                >
+                                  Profile <ExternalLink className="w-3 h-3" />
+                                </Link>
+                              )}
                             </div>
 
                             <p className="text-xs text-gray-700 font-medium">{meeting.title}</p>
@@ -555,10 +521,18 @@ export function MeetingsPage() {
                               {meeting.agenda && <p className="text-gray-600 italic mt-1">"{meeting.agenda}"</p>}
                             </div>
 
-                            <div className="mt-1">
+                            <div className="flex items-center justify-between mt-1 border-t border-gray-100 pt-2">
                               <span className="inline-block bg-slate-50 border border-slate-200 text-slate-600 text-[11px] px-2.5 py-0.5 rounded-full font-medium">
                                 {timeAgo(meeting.createdAt)}
                               </span>
+                              {meeting.leadId && (
+                                <Link
+                                  to={`/clients/${meeting.leadId}`}
+                                  className="text-[11px] font-semibold text-blue-600 hover:underline flex items-center gap-1"
+                                >
+                                  View 360° Profile <ExternalLink className="w-3 h-3" />
+                                </Link>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -614,7 +588,7 @@ export function MeetingsPage() {
 
                           {openMoreId === meeting.id && (
                             <div 
-                              className="absolute right-full mr-2 top-1/2 -translate-y-1/2 bg-white border border-gray-200 shadow-lg rounded-md p-1.5 flex items-center gap-1.5 z-50 animate-in fade-in zoom-in duration-150"
+                              className="absolute right-full mr-2 top-1/2 -translate-y-1/2 bg-white border border-gray-200 rounded-md p-1.5 flex items-center gap-1.5 z-50 animate-in fade-in zoom-in duration-150"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <button
@@ -781,37 +755,36 @@ export function MeetingsPage() {
           </table>
         </div>
 
-        {/* Pagination Controls - 1:1 Matching LeadsPage */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t border-gray-100 rounded-b-md">
-            <div className="text-xs text-gray-500">
-              Showing {(currentPage - 1) * pageSize + 1} to {Math.min(currentPage * pageSize, filteredMeetings.length)} of {filteredMeetings.length} meetings
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="h-8 px-2"
-              >
-                <ChevronLeft className="w-4 h-4 mr-1" /> Previous
-              </Button>
-              <span className="text-xs font-medium text-gray-700">
-                Page {currentPage} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="h-8 px-2"
-              >
-                Next <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </div>
+        {/* Pagination Toolbar - 1:1 Matching LeadsPage */}
+        <div className="p-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500 bg-white">
+          <div>
+            Showing {filteredMeetings.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} to{' '}
+            {Math.min(currentPage * pageSize, filteredMeetings.length)} of {filteredMeetings.length} entries
           </div>
-        )}
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="h-8 px-2 text-xs"
+            >
+              <ChevronLeft className="w-3.5 h-3.5 mr-1" /> Prev
+            </Button>
+            <span className="px-2 text-xs font-medium text-gray-700">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages || filteredMeetings.length === 0}
+              className="h-8 px-2 text-xs"
+            >
+              Next <ChevronRight className="w-3.5 h-3.5 ml-1" />
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* View Meeting Modal Component */}
@@ -830,25 +803,30 @@ export function MeetingsPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={async (newMeeting) => {
-          setMeetings(prev => [newMeeting, ...prev]);
           try {
             const token = localStorage.getItem('token');
             if (token) {
-              await api.post('/activities', {
-                type: 'MEETING',
+              const hostMember = availableMembers.find(m => m.name === newMeeting.host || m.email === newMeeting.host);
+              await api.post('/meetings', {
                 title: newMeeting.title,
-                description: newMeeting.agenda,
-                metadata: {
-                  name: newMeeting.clientName,
-                  companyName: newMeeting.clientCompany,
-                  meetingLink: newMeeting.meetingLink,
-                  duration: newMeeting.duration,
-                  activityDate: newMeeting.dateTime ? new Date(newMeeting.dateTime).toISOString() : new Date().toISOString()
-                }
+                clientName: newMeeting.clientName,
+                clientCompany: newMeeting.clientCompany,
+                clientEmail: newMeeting.clientEmail,
+                clientPhone: newMeeting.clientPhone,
+                dateTime: newMeeting.dateTime,
+                duration: newMeeting.duration,
+                type: newMeeting.type,
+                meetingLink: newMeeting.meetingLink,
+                hostId: hostMember?.id,
+                host: newMeeting.host,
+                status: newMeeting.status,
+                priority: newMeeting.priority,
+                agenda: newMeeting.agenda
               }, { headers: { Authorization: `Bearer ${token}` } });
+              fetchMeetingsData();
             }
           } catch (e) {
-            console.error('Failed to log meeting activity', e);
+            console.error('Failed to create meeting', e);
           }
         }}
         availableMembers={availableMembers}
@@ -862,8 +840,33 @@ export function MeetingsPage() {
           setSelectedMeeting(null);
         }}
         meeting={selectedMeeting}
-        onSave={(updatedMeeting) => {
-          setMeetings(meetings.map(m => m.id === updatedMeeting.id ? updatedMeeting : m));
+        onSave={async (updatedMeeting) => {
+          setMeetings(prev => prev.map(m => m.id === updatedMeeting.id ? updatedMeeting : m));
+          try {
+            const token = localStorage.getItem('token');
+            if (token) {
+              const hostMember = availableMembers.find(m => m.name === updatedMeeting.host || m.email === updatedMeeting.host);
+              await api.put(`/meetings/${updatedMeeting.id}`, {
+                title: updatedMeeting.title,
+                clientName: updatedMeeting.clientName,
+                clientCompany: updatedMeeting.clientCompany,
+                clientEmail: updatedMeeting.clientEmail,
+                clientPhone: updatedMeeting.clientPhone,
+                dateTime: updatedMeeting.dateTime,
+                duration: updatedMeeting.duration,
+                type: updatedMeeting.type,
+                meetingLink: updatedMeeting.meetingLink,
+                hostId: hostMember?.id,
+                host: updatedMeeting.host,
+                status: updatedMeeting.status,
+                priority: updatedMeeting.priority,
+                agenda: updatedMeeting.agenda
+              }, { headers: { Authorization: `Bearer ${token}` } });
+              fetchMeetingsData();
+            }
+          } catch (e) {
+            console.error('Failed to update meeting', e);
+          }
         }}
         availableMembers={availableMembers}
       />

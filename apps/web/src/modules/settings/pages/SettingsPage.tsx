@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CompanyProfilePage } from './CompanyProfilePage';
-import { TeamManagementTab } from '../components/TeamManagementTab';
+import { TeamManagementPage } from './TeamManagementPage';
+import { ManagementPage } from '@/modules/management/pages/ManagementPage';
 import api from '@/lib/api';
 
 export function SettingsPage() {
@@ -43,7 +44,11 @@ export function SettingsPage() {
         )}
 
         {activeTab === 'team' && (
-          <TeamManagementTab />
+          <TeamManagementPage />
+        )}
+
+        {activeTab === 'management' && (
+          <ManagementPage />
         )}
       </div>
     </div>

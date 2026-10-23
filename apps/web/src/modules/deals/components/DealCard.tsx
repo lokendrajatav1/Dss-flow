@@ -110,7 +110,7 @@ export function DealCard({ deal, onDelete, onEdit }: DealCardProps) {
         </div>
 
         <div className="flex flex-wrap gap-1 mt-2">
-          {deal.tags.map(tag => (
+          {deal.tags?.map(tag => (
             <span key={tag} className="text-[10px] font-medium bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
               {tag}
             </span>
@@ -120,11 +120,11 @@ export function DealCard({ deal, onDelete, onEdit }: DealCardProps) {
         <div className="pt-2 mt-2 border-t border-gray-50 flex items-center justify-between text-[11px] text-gray-400">
           <div className="flex items-center gap-1">
             <User className="w-3 h-3" />
-            <span>{deal.assignedTo.split(' ')[0]}</span>
+            <span>{deal.assignedTo ? deal.assignedTo.split(' ')[0] : 'Unassigned'}</span>
           </div>
           <div className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
-            <span>{new Date(deal.expectedCloseDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+            <span>{deal.expectedCloseDate ? new Date(deal.expectedCloseDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'No date'}</span>
           </div>
         </div>
       </div>

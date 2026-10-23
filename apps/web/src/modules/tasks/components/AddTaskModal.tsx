@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TaskItem, TASK_PRIORITIES, TASK_STATUSES } from '../types';
+import { EntityLookupInput, EntityLookupItem } from '@/components/common/EntityLookupInput';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 
@@ -23,6 +24,7 @@ interface AddTaskModalProps {
 
 export function AddTaskModal({ isOpen, onClose, onSave, availableMembers }: AddTaskModalProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedEntity, setSelectedEntity] = useState<EntityLookupItem | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     clientName: '',
@@ -38,6 +40,7 @@ export function AddTaskModal({ isOpen, onClose, onSave, availableMembers }: AddT
   useEffect(() => {
     if (isOpen) {
       setIsLoading(false);
+      setSelectedEntity(null);
       setFormData({
         title: '',
         clientName: '',
@@ -51,6 +54,19 @@ export function AddTaskModal({ isOpen, onClose, onSave, availableMembers }: AddT
       });
     }
   }, [isOpen, availableMembers]);
+
+  const handleSelectEntity = (item: EntityLookupItem | null) => {
+    setSelectedEntity(item);
+    if (item) {
+      setFormData(prev => ({
+        ...prev,
+        clientName: item.name,
+        companyName: item.companyName || '',
+        phone: item.phone || '',
+        assignedTo: (typeof item.assignedTo === 'string' ? item.assignedTo : item.assignedTo?.name) || prev.assignedTo
+      }));
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -96,7 +112,7 @@ export function AddTaskModal({ isOpen, onClose, onSave, availableMembers }: AddT
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-xl animate-in fade-in zoom-in duration-200">
+      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col border border-gray-200 animate-in fade-in zoom-in duration-200">
         {/* Modal Header */}
         <div className="flex-none flex items-center justify-between p-4 border-b border-gray-100 bg-white rounded-t-2xl z-20">
           <h2 className="text-xl font-semibold text-gray-900">Add New Task</h2>
@@ -115,6 +131,17 @@ export function AddTaskModal({ isOpen, onClose, onSave, availableMembers }: AddT
                 placeholder="e.g. Follow up with client regarding proposal" 
                 value={formData.title} 
                 onChange={e => setFormData({ ...formData, title: e.target.value })} 
+              />
+            </div>
+
+            {/* Related Entity Selector */}
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-1.5">
+                Related To
+              </label>
+              <EntityLookupInput
+                onSelect={handleSelectEntity}
+                selectedItem={selectedEntity}
               />
             </div>
 

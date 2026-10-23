@@ -1,0 +1,72 @@
+# ==============================================================================
+# DSS FLOW CRM - Hostinger VPS Nginx Configuration
+# Frontend Domain: dssflow.digitalsuccesssolutions.in
+# Backend API Domain: api-crm.digitalsuccesssolutions.in
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. FRONTEND APP (React Vite SPA)
+# ------------------------------------------------------------------------------
+server {
+    listen 80;
+    server_name dssflow.digitalsuccesssolutions.in;
+
+    root /var/www/crm/apps/web/dist;
+    index index.html;
+
+    # Gzip Compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_proxied expired no-cache no-store private auth;
+    gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml application/javascript;
+
+    # Static Assets Caching (Vite builds hashed filenames)
+    location ~* \.(?:css|js|woff2?|eot|ttf|otf|ico|png|jpg|jpeg|webp|svg)$ {
+        expires 1y;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        access_log off;
+    }
+
+    # SPA Routing: Send all non-file requests to index.html
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+
+# ------------------------------------------------------------------------------
+# 2. BACKEND API & SOCKET.IO (Express Node.js on Port 4000)
+# ------------------------------------------------------------------------------
+server {
+    listen 80;
+    server_name api-crm.digitalsuccesssolutions.in;
+
+    client_max_body_size 50M;
+
+    # WebSockets / Socket.io for Real-Time Chat & Live Updates
+    location /socket.io/ {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+
+    # All API endpoints, webhooks, and health checks
+    location / {
+        proxy_pass http://127.0.0.1:4000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+}

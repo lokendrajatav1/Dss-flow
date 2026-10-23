@@ -9,7 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Package,
-  FileText
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import api from '@/lib/api';
@@ -17,20 +17,18 @@ import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-  PRODUCT_CATEGORIES,
   PRODUCT_STATUSES,
   PRODUCT_STATUS_COLORS,
 } from '@/lib/constants';
 
 const MySwal = withReactContent(Swal);
-
-const CATEGORY_OPTIONS = ['all', ...PRODUCT_CATEGORIES];
 const STATUS_COLORS = PRODUCT_STATUS_COLORS;
 
 export function ProductsPage() {
   const navigate = useNavigate();
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>(['all']);
 
   // Search, Filter, Pagination, Selection
   const [searchQuery, setSearchQuery] = useState('');
@@ -42,6 +40,14 @@ export function ProductsPage() {
 
   useEffect(() => {
     fetchProducts();
+    api.get('/categories')
+      .then((res) => {
+        if (Array.isArray(res.data) && res.data.length > 0) {
+          const names = res.data.map((c: any) => c.name);
+          setCategoryOptions(['all', ...Array.from(new Set(names))]);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const fetchProducts = async () => {
@@ -231,7 +237,7 @@ export function ProductsPage() {
             }}
             className="h-9 border border-gray-200 rounded-md px-2 text-sm outline-none focus:border-blue-500 bg-white cursor-pointer"
           >
-            {CATEGORY_OPTIONS.map(c => (
+            {categoryOptions.map(c => (
               <option key={c} value={c}>{c === 'all' ? 'All Categories' : c}</option>
             ))}
           </select>

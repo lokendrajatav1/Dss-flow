@@ -13,6 +13,7 @@ import withReactContent from 'sweetalert2-react-content';
 import { AddLeadModal } from '../components/AddLeadModal';
 import { EditLeadModal } from '../components/EditLeadModal';
 import { SetReminderModal } from '../components/SetReminderModal';
+import { useDialer } from '@/context/TelephonyContext';
 import { LeadFilterSidebar, LeadFilterState, initialFilterState } from '../components/LeadFilterSidebar';
 import { CALL_STATUSES, LEAD_SOURCES, LEAD_PRIORITIES } from '@/lib/constants';
 
@@ -49,7 +50,7 @@ const timeAgo = (dateStr: string) => {
 export function LeadsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentType = searchParams.get('is_type') || 'lead'; // 'lead', 'client', 'deal'
-  
+
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -61,6 +62,7 @@ export function LeadsPage() {
   const [openPhonePopupId, setOpenPhonePopupId] = useState<string | null>(null);
   const [openEmailPopupId, setOpenEmailPopupId] = useState<string | null>(null);
   const [openWhatsappPopupId, setOpenWhatsappPopupId] = useState<string | null>(null);
+  const { startCall } = useDialer();
 
   // Search, Filter, Pagination, and Selection States
   const [searchQuery, setSearchQuery] = useState('');
@@ -135,16 +137,12 @@ export function LeadsPage() {
     }
   };
 
-  const handleCallStatusSelect = async (lead: any, status: string) => {
-    // 1. Immediately update status in UI and DB
-    await updateCallStatus(lead.id, status);
-
-    // 2. If it's a scheduled callback or meeting, open the reminder modal for setting follow-up date/time
-    if (status === 'Callback Scheduled' || status === 'Call Back Later' || status === 'Meeting Scheduled') {
-      setSelectedLead({ ...lead, callStatus: status });
-      setPendingCallStatus(status);
-      setIsReminderModalOpen(true);
-    }
+  const handleCallStatusSelect = (lead: any, status: string) => {
+    // Open the reminder modal to confirm status, feedback and follow-up.
+    // Status is ONLY saved to the database if the user clicks SAVE in the modal.
+    setSelectedLead({ ...lead, callStatus: status });
+    setPendingCallStatus(status);
+    setIsReminderModalOpen(true);
   };
 
   const togglePriority = async (lead: any) => {
@@ -297,7 +295,7 @@ export function LeadsPage() {
       to.setHours(23, 59, 59, 999);
       matchesDate = matchesDate && new Date(lead.createdAt) <= to;
     }
-    
+
     let matchesFollowup = true;
     if (filters.filterFollowupFromDate && lead.nextFollowup) {
       matchesFollowup = matchesFollowup && new Date(lead.nextFollowup) >= new Date(filters.filterFollowupFromDate);
@@ -307,7 +305,7 @@ export function LeadsPage() {
       to.setHours(23, 59, 59, 999);
       matchesFollowup = matchesFollowup && new Date(lead.nextFollowup) <= to;
     }
-    
+
     const matchesAssignee = filters.filterAssignee === 'all' || lead.assignedToId === filters.filterAssignee;
     const matchesUnassigned = filters.filterUnassigned ? !lead.assignedToId : true;
 
@@ -340,11 +338,11 @@ export function LeadsPage() {
             <Filter className="w-4 h-4" />
           </Button>
 
-          <LeadFilterSidebar 
-            isOpen={showFilterDropdown} 
-            onClose={() => setShowFilterDropdown(false)} 
-            filters={filters} 
-            setFilters={setFilters} 
+          <LeadFilterSidebar
+            isOpen={showFilterDropdown}
+            onClose={() => setShowFilterDropdown(false)}
+            filters={filters}
+            setFilters={setFilters}
           />
 
           <Button
@@ -441,22 +439,22 @@ export function LeadsPage() {
                           checked={selectedLeadIds.includes(lead.id)}
                           onChange={(e) => handleSelectLead(lead.id, e.target.checked)}
                         />
-                        <span 
+                        <span
                           title={lead.priority === 'High' || lead.priority === 'Urgent' ? 'High Priority' : 'Mark as High Priority'}
                           onClick={(e) => { e.stopPropagation(); togglePriority(lead); }}
                           className="inline-flex cursor-pointer"
                         >
-                          <Star 
-                            className={`w-4 h-4 transition-colors ${lead.priority === 'High' || lead.priority === 'Urgent' ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400 hover:text-yellow-400'}`} 
+                          <Star
+                            className={`w-4 h-4 transition-colors ${lead.priority === 'High' || lead.priority === 'Urgent' ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400 hover:text-yellow-400'}`}
                           />
                         </span>
                         <div className="relative group/name">
                           <Link to={`/clients/${lead.id}`} className="text-gray-700 font-medium hover:text-blue-600 hover:underline">{lead.name || lead.title || 'Unknown'}</Link>
-                          
+
                           {/* Hover Popover */}
                           <div className="hidden group-hover/name:flex absolute left-0 top-full mt-2 group-last/row:top-auto group-last/row:bottom-full group-last/row:mb-2 w-64 bg-white border border-gray-200 rounded-lg shadow-xl z-[60] p-4 flex-col gap-3">
                             <div className="absolute -top-1.5 group-last/row:top-auto group-last/row:-bottom-1.5 left-4 w-3 h-3 bg-white border-t border-l group-last/row:border-t-0 group-last/row:border-l-0 group-last/row:border-b group-last/row:border-r border-gray-200 transform rotate-45"></div>
-                            
+
                             <div className="flex items-center gap-3 text-sm">
                               <User className="w-4 h-4 text-indigo-600 fill-indigo-600" />
                               <span className="font-semibold text-gray-800">{lead.name || lead.title || 'Unknown'}</span>
@@ -475,9 +473,9 @@ export function LeadsPage() {
                             </div>
                             <div className="flex items-center gap-3 text-sm">
                               <Megaphone className="w-4 h-4 text-slate-500" />
-                              <span className="text-gray-600">0</span>
+                              <span className="text-gray-600">{lead.followUpCount || 0}</span>
                             </div>
-                            
+
                             <div className="mt-1">
                               <span className="inline-block bg-slate-50 border border-slate-200 text-slate-600 text-[11px] px-2.5 py-0.5 rounded-full font-medium">
                                 {timeAgo(lead.createdAt)}
@@ -485,18 +483,20 @@ export function LeadsPage() {
                             </div>
                           </div>
                         </div>
-                        
+
                         {/* Source Icon */}
                         {lead.source && (
                           <span title={`Source: ${lead.source}`} className="flex items-center ml-1">
-                            {lead.source.toLowerCase() === 'facebook' ? (
+                            {lead.source.toLowerCase().includes('facebook') || lead.source.toLowerCase().includes('meta') ? (
                               <FaFacebook className="w-4 h-4 text-blue-600" />
+                            ) : lead.source.toLowerCase().includes('sheets') ? (
+                              <img src="https://upload.wikimedia.org/wikipedia/commons/3/30/Google_Sheets_logo_%282014-2020%29.svg" className="w-4 h-4 object-contain" alt="Google Sheets" />
                             ) : lead.source.toLowerCase() === 'whatsapp' ? (
                               <WhatsAppIcon className="w-4 h-4 text-green-500" />
                             ) : lead.source.toLowerCase() === 'website' ? (
                               <Globe className="w-4 h-4 text-blue-500" />
                             ) : (
-                              <span 
+                              <span
                                 style={getBadgeStyle(lead.source)}
                                 className="inline-flex items-center justify-center text-[10px] leading-none font-semibold px-2 py-1.5 rounded border whitespace-nowrap"
                               >
@@ -582,7 +582,7 @@ export function LeadsPage() {
                       <div className="flex items-center border border-gray-200 rounded divide-x divide-gray-200 bg-white">
                         {lead.email ? (
                           <div className="relative">
-                            <button 
+                            <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setOpenEmailPopupId(openEmailPopupId === lead.id ? null : lead.id);
@@ -590,21 +590,21 @@ export function LeadsPage() {
                                 setOpenWhatsappPopupId(null);
                                 setOpenMoreId(null);
                               }}
-                              className="p-1.5 hover:bg-gray-50 text-teal-600 rounded-none border-0 block" 
+                              className="p-1.5 hover:bg-gray-50 text-teal-600 rounded-none border-0 block"
                               title="Email"
                             >
                               <Mail className="w-4 h-4" />
                             </button>
 
                             {openEmailPopupId === lead.id && (
-                              <div 
+                              <div
                                 className="absolute right-full mr-2 top-1/2 -translate-y-1/2 bg-white border border-gray-200 shadow-lg rounded-md p-1.5 flex items-center gap-2 z-50 animate-in fade-in zoom-in duration-150"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <Mail className="w-3.5 h-3.5 text-gray-700 ml-1" />
                                 <span className="text-[13px] text-gray-800 font-medium font-mono max-w-[200px] truncate" title={lead.email}>{lead.email}</span>
-                                
-                                <button 
+
+                                <button
                                   onClick={() => {
                                     navigator.clipboard.writeText(lead.email!);
                                     Swal.fire({ title: 'Copied!', text: 'Email copied to clipboard', icon: 'success', timer: 1000, showConfirmButton: false });
@@ -616,7 +616,7 @@ export function LeadsPage() {
                                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                                 </button>
 
-                                <Link 
+                                <Link
                                   to={`/email?composeTo=${lead.email}`}
                                   className="w-7 h-7 rounded bg-teal-500 hover:bg-teal-600 flex items-center justify-center text-white transition-colors mr-0.5 flex-shrink-0"
                                   title="Compose Email"
@@ -636,7 +636,7 @@ export function LeadsPage() {
                         )}
                         {lead.phone ? (
                           <div className="relative">
-                            <button 
+                            <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setOpenPhonePopupId(openPhonePopupId === lead.id ? null : lead.id);
@@ -644,21 +644,21 @@ export function LeadsPage() {
                                 setOpenWhatsappPopupId(null);
                                 setOpenMoreId(null);
                               }}
-                              className="p-1.5 hover:bg-gray-50 text-red-500 rounded-none border-0 block" 
+                              className="p-1.5 hover:bg-gray-50 text-red-500 rounded-none border-0 block"
                               title="Phone"
                             >
                               <Phone className="w-4 h-4" />
                             </button>
 
                             {openPhonePopupId === lead.id && (
-                              <div 
+                              <div
                                 className="absolute right-full mr-2 top-1/2 -translate-y-1/2 bg-white border border-gray-200 shadow-lg rounded-md p-1.5 flex items-center gap-2 z-50 animate-in fade-in zoom-in duration-150"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <Phone className="w-3.5 h-3.5 text-gray-700 ml-1" />
                                 <span className="text-[13px] text-gray-800 font-medium font-mono">{lead.phone}</span>
-                                
-                                <button 
+
+                                <button
                                   onClick={() => {
                                     navigator.clipboard.writeText(lead.phone!);
                                     Swal.fire({ title: 'Copied!', text: 'Phone number copied to clipboard', icon: 'success', timer: 1000, showConfirmButton: false });
@@ -670,18 +670,24 @@ export function LeadsPage() {
                                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                                 </button>
 
-                                <a 
-                                  href={`tel:${lead.phone}`}
+                                <button
+                                  type="button"
                                   onClick={() => {
-                                    setSelectedLead(lead);
-                                    setPendingCallStatus(lead.callStatus && lead.callStatus !== 'Untouched' ? lead.callStatus : 'Connected');
-                                    setIsReminderModalOpen(true);
+                                    setOpenPhonePopupId(null);
+                                    startCall({
+                                      id: lead.id,
+                                      name: lead.name,
+                                      phone: lead.phone!,
+                                      companyName: lead.companyName,
+                                      email: lead.email,
+                                      sourceType: 'lead'
+                                    });
                                   }}
-                                  className="w-7 h-7 rounded bg-purple-500 hover:bg-purple-600 flex items-center justify-center text-white transition-colors mr-0.5"
-                                  title="Call & Log Outcome"
+                                  className="w-7 h-7 rounded bg-indigo-600 hover:bg-indigo-700 flex items-center justify-center text-white transition-colors mr-0.5 cursor-pointer shadow-xs"
+                                  title="In-App Web Call"
                                 >
                                   <Phone className="w-3.5 h-3.5" />
-                                </a>
+                                </button>
 
                                 {/* Right Arrow Triangle */}
                                 <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white border-r border-t border-gray-200 rotate-45 pointer-events-none"></div>
@@ -695,7 +701,7 @@ export function LeadsPage() {
                         )}
                         {(lead.whatsappNumber || lead.phone) ? (
                           <div className="relative">
-                            <button 
+                            <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setOpenWhatsappPopupId(openWhatsappPopupId === lead.id ? null : lead.id);
@@ -703,21 +709,21 @@ export function LeadsPage() {
                                 setOpenPhonePopupId(null);
                                 setOpenMoreId(null);
                               }}
-                              className="p-1.5 hover:bg-gray-50 text-green-500 rounded-none border-0 block" 
+                              className="p-1.5 hover:bg-gray-50 text-green-500 rounded-none border-0 block"
                               title="WhatsApp"
                             >
                               <WhatsAppIcon className="w-4 h-4" />
                             </button>
 
                             {openWhatsappPopupId === lead.id && (
-                              <div 
+                              <div
                                 className="absolute right-full mr-2 top-1/2 -translate-y-1/2 bg-white border border-gray-200 shadow-lg rounded-md p-1.5 flex items-center gap-2 z-50 animate-in fade-in zoom-in duration-150"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <WhatsAppIcon className="w-3.5 h-3.5 text-gray-700 ml-1" />
                                 <span className="text-[13px] text-gray-800 font-medium font-mono">{lead.whatsappNumber || lead.phone}</span>
-                                
-                                <button 
+
+                                <button
                                   onClick={() => {
                                     navigator.clipboard.writeText((lead.whatsappNumber || lead.phone)!);
                                     Swal.fire({ title: 'Copied!', text: 'WhatsApp number copied to clipboard', icon: 'success', timer: 1000, showConfirmButton: false });
@@ -729,7 +735,7 @@ export function LeadsPage() {
                                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                                 </button>
 
-                                <a 
+                                <a
                                   href={`https://wa.me/${(lead.whatsappNumber || lead.phone)!.replace(/[^0-9]/g, '')}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
@@ -817,10 +823,10 @@ export function LeadsPage() {
 
       <SetReminderModal
         isOpen={isReminderModalOpen}
-        onClose={() => { 
-          setIsReminderModalOpen(false); 
-          setSelectedLead(null); 
-          setPendingCallStatus(undefined); 
+        onClose={() => {
+          setIsReminderModalOpen(false);
+          setSelectedLead(null);
+          setPendingCallStatus(undefined);
         }}
         lead={selectedLead}
         initialCallStatus={pendingCallStatus}

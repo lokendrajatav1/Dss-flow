@@ -14,21 +14,20 @@ interface ProductModalProps {
 }
 
 import {
-  PRODUCT_CATEGORIES,
   PRODUCT_UNITS,
   PRODUCT_TAX_RATE_OPTIONS,
   PRODUCT_STATUSES,
   PRODUCT_TYPES,
 } from '@/lib/constants';
+import { CategorySelectDropdown } from '@/components/common/CategorySelectDropdown';
 
-const CATEGORIES = PRODUCT_CATEGORIES;
 const UNITS = PRODUCT_UNITS;
 const TAX_RATES = PRODUCT_TAX_RATE_OPTIONS;
 
 const initialProductFormData = {
   name: '',
   sku: '',
-  category: 'General',
+  category: '',
   productType: 'Goods',
   price: '',
   costPrice: '',
@@ -53,7 +52,7 @@ export function ProductModal({ isOpen, onClose, product, onSaved }: ProductModal
       setFormData({
         name: product.name || '',
         sku: product.sku || '',
-        category: product.category || 'General',
+        category: product.category || '',
         productType: product.productType || 'Goods',
         price: product.price !== undefined ? String(product.price) : '',
         costPrice: product.costPrice !== undefined ? String(product.costPrice) : '',
@@ -244,15 +243,11 @@ export function ProductModal({ isOpen, onClose, product, onSaved }: ProductModal
                 <label className="block text-sm font-medium text-gray-900 mb-1">
                   Category
                 </label>
-                <select
-                  className="w-full h-10 px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-0 focus:border-gray-300 text-sm bg-white"
+                <CategorySelectDropdown
                   value={formData.category}
-                  onChange={e => handleChange('category', e.target.value)}
-                >
-                  {CATEGORIES.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
+                  onChange={cat => handleChange('category', cat)}
+                  heightClass="h-10"
+                />
               </div>
 
               {/* Unit of Measurement */}

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { CALL_STATUSES } from '@/lib/constants';
 import { CallItem, CALL_DIRECTIONS, CALL_OUTCOMES } from '../types';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
@@ -45,8 +44,8 @@ export function EditCallModal({ isOpen, onClose, call, onSave, availableMembers 
     if (isOpen && call) {
       setIsLoading(false);
       const parts = (call.duration || '05:00').split(':');
-      const dt = call.dateTime 
-        ? call.dateTime 
+      const dt = call.dateTime
+        ? call.dateTime
         : (call.createdAt ? call.createdAt.slice(0, 16) : getNowLocalDateTime());
 
       setFormData({
@@ -112,7 +111,7 @@ export function EditCallModal({ isOpen, onClose, call, onSave, availableMembers 
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-xl animate-in fade-in zoom-in duration-200">
+      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col border border-gray-200 animate-in fade-in zoom-in duration-200">
         {/* Modal Header */}
         <div className="flex-none flex items-center justify-between p-4 border-b border-gray-100 bg-white rounded-t-2xl z-20">
           <h2 className="text-xl font-semibold text-gray-900">Edit Call Record</h2>
@@ -127,17 +126,17 @@ export function EditCallModal({ isOpen, onClose, call, onSave, availableMembers 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-1">Contact Name *</label>
-                <Input 
-                  required 
-                  value={formData.name} 
-                  onChange={e => setFormData({ ...formData, name: e.target.value })} 
+                <Input
+                  required
+                  value={formData.name}
+                  onChange={e => setFormData({ ...formData, name: e.target.value })}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-1">Company Name</label>
-                <Input 
-                  value={formData.companyName} 
-                  onChange={e => setFormData({ ...formData, companyName: e.target.value })} 
+                <Input
+                  value={formData.companyName}
+                  onChange={e => setFormData({ ...formData, companyName: e.target.value })}
                 />
               </div>
             </div>
@@ -145,25 +144,25 @@ export function EditCallModal({ isOpen, onClose, call, onSave, availableMembers 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-1">Phone Number *</label>
-                <Input 
-                  required 
-                  value={formData.phone} 
-                  onChange={e => setFormData({ ...formData, phone: e.target.value })} 
+                <Input
+                  required
+                  value={formData.phone}
+                  onChange={e => setFormData({ ...formData, phone: e.target.value })}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-1">Email Address</label>
-                <Input 
-                  type="email" 
-                  value={formData.email} 
-                  onChange={e => setFormData({ ...formData, email: e.target.value })} 
+                <Input
+                  type="email"
+                  value={formData.email}
+                  onChange={e => setFormData({ ...formData, email: e.target.value })}
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">Direction</label>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Call Type</label>
                 <select
                   value={formData.direction}
                   onChange={e => setFormData({ ...formData, direction: e.target.value })}
@@ -173,17 +172,7 @@ export function EditCallModal({ isOpen, onClose, call, onSave, availableMembers 
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">Call Status</label>
-                <select
-                  value={formData.callStatus}
-                  onChange={e => setFormData({ ...formData, callStatus: e.target.value })}
-                  className="w-full h-10 px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-0 focus:border-gray-300 text-sm bg-white cursor-pointer"
-                >
-                  {CALL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-1">Call Outcome</label>
+                <label className="block text-sm font-medium text-gray-900 mb-1">Call Result</label>
                 <select
                   value={formData.outcome}
                   onChange={e => setFormData({ ...formData, outcome: e.target.value })}
@@ -198,11 +187,11 @@ export function EditCallModal({ isOpen, onClose, call, onSave, availableMembers 
               {/* Single combined Date field */}
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-1">Date</label>
-                <input 
-                  type="datetime-local" 
-                  required 
-                  value={formData.dateTime} 
-                  onChange={e => setFormData({ ...formData, dateTime: e.target.value })} 
+                <input
+                  type="datetime-local"
+                  required
+                  value={formData.dateTime}
+                  onChange={e => setFormData({ ...formData, dateTime: e.target.value })}
                   className="w-full h-10 px-3 py-2 rounded-md border border-gray-300 focus:outline-none focus:ring-0 focus:border-gray-300 text-sm bg-white cursor-pointer"
                 />
               </div>
@@ -210,19 +199,19 @@ export function EditCallModal({ isOpen, onClose, call, onSave, availableMembers 
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-1">Duration (Min : Sec)</label>
                 <div className="flex items-center gap-1.5">
-                  <Input 
-                    type="number" 
-                    min="0" 
-                    value={formData.durationMinutes} 
-                    onChange={e => setFormData({ ...formData, durationMinutes: e.target.value })} 
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.durationMinutes}
+                    onChange={e => setFormData({ ...formData, durationMinutes: e.target.value })}
                   />
                   <span className="text-gray-400 font-bold">:</span>
-                  <Input 
-                    type="number" 
-                    min="0" 
-                    max="59" 
-                    value={formData.durationSeconds} 
-                    onChange={e => setFormData({ ...formData, durationSeconds: e.target.value })} 
+                  <Input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={formData.durationSeconds}
+                    onChange={e => setFormData({ ...formData, durationSeconds: e.target.value })}
                   />
                 </div>
               </div>
@@ -257,17 +246,17 @@ export function EditCallModal({ isOpen, onClose, call, onSave, availableMembers 
 
           {/* Modal Footer */}
           <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-100 bg-white rounded-b-2xl">
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               onClick={onClose}
               disabled={isLoading}
               className="px-4 h-10 rounded-md text-sm"
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={isLoading}
               className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[140px] h-10 px-5 rounded-md font-medium text-sm flex items-center justify-center gap-2"
             >
