@@ -84,17 +84,16 @@ export function DashboardLayout() {
     name: string;
     href?: string;
     icon: React.ElementType;
-    roles: UserRole[];
+    roles?: UserRole[];
     children?: { name: string; href: string; icon?: React.ElementType }[];
   };
 
   const navigation: NavItem[] = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['superadmin', 'companyadmin', 'employee'] },
-    { name: 'Management Hub', href: '/management', icon: LayoutGrid, roles: ['superadmin', 'companyadmin'] },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Management Hub', href: '/management', icon: LayoutGrid, roles: ['companyadmin'] },
     {
       name: 'Sales',
       icon: Target,
-      roles: ['superadmin', 'companyadmin', 'employee'],
       children: [
         { name: 'Leads', href: '/lead-manager', icon: UserPlus },
         { name: 'Leads Pipelines', href: '/leads-pipelines', icon: GitBranch },
@@ -109,7 +108,6 @@ export function DashboardLayout() {
     {
       name: 'Inventory',
       icon: Package,
-      roles: ['superadmin', 'companyadmin', 'employee'],
       children: [
         { name: 'Products', href: '/products', icon: Package },
         { name: 'Price Books', href: '/price-books', icon: Tag },
@@ -123,26 +121,26 @@ export function DashboardLayout() {
     {
       name: 'Communication',
       icon: MessageCircle,
-      roles: ['superadmin', 'companyadmin', 'employee'],
       children: [
         { name: 'Inbox', href: '/inbox', icon: Inbox },
         { name: 'WhatsApp', href: '/whatsapp', icon: MessageCircle },
         { name: 'Email', href: '/email', icon: Mail },
       ]
     },
+    /*
     {
       name: 'Automations',
       icon: Workflow,
-      roles: ['superadmin', 'companyadmin'],
+      roles: ['companyadmin'],
       children: [
         { name: 'Workflows', href: '/workflows', icon: Workflow },
         { name: 'AI Assistant', href: '/ai', icon: Bot },
       ]
     },
+    */
     {
       name: 'Activities',
       icon: ClipboardCheck,
-      roles: ['superadmin', 'companyadmin', 'employee'],
       children: [
         { name: 'Tasks', href: '/tasks', icon: ClipboardCheck },
         { name: 'Meetings', href: '/meetings', icon: Calendar },
@@ -152,19 +150,18 @@ export function DashboardLayout() {
     {
       name: 'Support',
       icon: LifeBuoy,
-      roles: ['superadmin', 'companyadmin', 'employee'],
       children: [
         { name: 'Cases', href: '/cases', icon: Ticket },
         { name: 'Solutions', href: '/solutions', icon: MessageSquareText },
       ]
     },
-    { name: 'Reports', href: '/reports', icon: BarChart, roles: ['superadmin', 'companyadmin'] },
-    { name: 'Team & Permissions', href: '/team', icon: Users, roles: ['superadmin', 'companyadmin'] },
-    { name: 'Integrations', href: '/integrations', icon: Blocks, roles: ['superadmin', 'companyadmin'] },
+    { name: 'Reports', href: '/reports', icon: BarChart, roles: ['companyadmin'] },
+  
+    { name: 'Integrations', href: '/integrations', icon: Blocks, roles: ['companyadmin'] },
     {
       name: 'Settings',
       icon: Settings,
-      roles: ['superadmin', 'companyadmin'],
+      roles: ['companyadmin'],
       children: [
         { name: 'Company Profile', href: '/company-profile', icon: Building2 },
         { name: 'Team & Roles', href: '/team', icon: Users },
@@ -172,8 +169,12 @@ export function DashboardLayout() {
     },
   ];
 
-  // Filter navigation by current user's role
-  const visibleNav = navigation.filter(item => user && item.roles.includes(user.role));
+  // Standard RBAC: Superadmin gets full access automatically, other users filtered by role
+  const visibleNav = navigation.filter(item => {
+    if (!user) return false;
+    if (user.role === 'superadmin') return true;
+    return !item.roles || item.roles.includes(user.role);
+  });
 
   return (
     <div className="h-screen bg-gray-50 flex overflow-hidden">
