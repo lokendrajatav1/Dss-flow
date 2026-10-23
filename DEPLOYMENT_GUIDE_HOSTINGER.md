@@ -66,8 +66,8 @@ pm2 -v    # 5.x.x
 
 ## Step 4: Clone Your Project on VPS
 ```bash
-mkdir -p /var/www/crm
-cd /var/www/crm
+mkdir -p /var/www/dssflow
+cd /var/www/dssflow
 
 # Clone your GitHub repository:
 git clone YOUR_GITHUB_REPO_URL .
@@ -111,7 +111,7 @@ VITE_FACEBOOK_APP_ID=2520039771825254
 ---
 
 ## Step 6: Install Dependencies & Build
-From root `/var/www/crm`:
+From root `/var/www/dssflow`:
 ```bash
 # 1. Install all dependencies
 pnpm install
@@ -181,7 +181,7 @@ sudo certbot --nginx -d dssflow.digitalsuccesssolutions.in -d api-crm.digitalsuc
 - **PM2 Logs**: `pm2 logs crm-api`
 - **Update Code after Git Push**:
   ```bash
-  cd /var/www/crm
+  cd /var/www/dssflow
   git pull
   pnpm install
   pnpm run build

@@ -11,7 +11,7 @@ server {
     listen 80;
     server_name dssflow.digitalsuccesssolutions.in;
 
-    root /var/www/crm/apps/web/dist;
+    root /var/www/dssflow/apps/web/dist;
     index index.html;
 
     # Gzip Compression
